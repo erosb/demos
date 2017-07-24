@@ -1,0 +1,17 @@
+# Transparent SOCKS proxy
+# See: http://darkk.net.ru/redsocks/
+
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+:REDIRTEST - [0:0]
+
+# Redirect all output through redsocks
+-A OUTPUT -p tcp --dport 60041 -j REDIRTEST
+
+# Redirect everything else to redsocks port
+-A REDIRTEST -p tcp -j REDIRECT --to-ports 60040
+
+COMMIT
