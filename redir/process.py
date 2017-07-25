@@ -2,21 +2,21 @@
 # coding: utf-8
 
 
-PROCESS = '''
+PROCESS = '''             local socket
            send              EPOLLIN
  client ----------> local -------------> local_sock.recv() ------> build & save
                                                                    remote socket
                                                                              |
                                                                              |
-                                                              send to server |
+                                                     remote socket EPOLLOUT  |
+                                                       & send to server      |
                                                                              |
-                                                                             |
-                                                              EPOLLIN        V
-   build & save  <------------------ server_socket.recv() <-------------- server
-   remote socket
-         |
-         | send to dest server
-         |
+                     unpack data                                             V
+   build & save  <------------------ local_sock.recv() <----------------- server
+   remote socket                                            local socket
+         |                                                    EPOLLIN
+         |   remote socket EPOLLOUT
+         |   & send to dest server
          V
   ---------------
   |             |
@@ -28,16 +28,16 @@ PROCESS = '''
          |
          V
       server
-         |
-         |    EPOLLIN                              return to local
-         ----------------> server_socket.recv() --------------------> local-----
+         | remote socket
+         |    EPOLLIN                             return to local
+         ----------------> remote_sock.recv() ----------------------> local ----
             find socket                                                        |
                                                                                |
-                                                                     EPOLLIN   |
-                                                                   find socket |
-                                                                               |
-                         return to client                                      |
-               client <-------------------- local_sock.recv() <-----------------
+                                                        remote socket EPOLLIN  |
+                                                             find socket       |
+                         return data to                                        |
+                         client's socket                                       |
+               client <-------------------- remote_sock.recv() <----------------
 '''
 
 
