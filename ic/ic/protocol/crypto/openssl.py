@@ -92,6 +92,7 @@ class OpenSSLCryptor(object):
         buf_size = self.buf_size if self.buf_size >= inl else inl * 2
         out = create_string_buffer(buf_size)
         outl = c_long(0)
+
         libcrypto.EVP_CipherUpdate(
             self._cph_ctx,
             byref(out),
@@ -99,6 +100,7 @@ class OpenSSLCryptor(object):
             in_,
             inl,
         )
+        self.reset()
         return out.raw[:outl.value]
 
     def clean(self):
