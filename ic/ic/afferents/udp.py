@@ -12,15 +12,18 @@ UDP_BUFFER_SIZE = 65535
 
 class UDPReceiver():
 
-    poll_events = select.EPOLLIN | select.EPOLLERR
+    ''' A normal implementation of the afferents
+    '''
+
+    EV_MASK = select.EPOLLIN
 
     def __init__(self, config):
         self.config = config
-        self._server_sock = self.mk_server_sock()
-        self._server_fd = self._server_sock.fileno()
+        self._sock = self.create_socket()
+        self._fd = self._sock.fileno()
         self._epoll = select.epoll()
 
-    def create_server_socket(self):
+    def create_socket(self):
         af, type_, proto, canon, sa = socket.getaddrinfo(
                                           host=self.config.listen_addr,
                                           port=self.config.listen_port,
@@ -37,16 +40,52 @@ class UDPReceiver():
         return sock
 
     def start(self):
-        self._epoll.register(self._server_fd, self.poll_events)
-        self._server_sock.bind(
+        self._epoll.register(self._fd, self.EV_MASK)
+        self._sock.bind(
             (self.config.listen_addr, self.config.listen_port)
         )
+
+    def stop(self):
+        self._epoll.unregister(self._fd)
+        self._sock.close()
 
     def recv(self):
         pkgs = []
         events = self._epoll.poll(POLL_TIMEOUT)
 
         for fd, evt in events:
-            data, src = self._server_sock.recvfrom(UDP_BUFFER_SIZE)
+            data, src = self._sock.recvfrom(UDP_BUFFER_SIZE)
             pkg = UDPPackage(data=data, src_ip=src[0], src_port=src[1])
             pkgs.append(pkg)
+
+        return pkgs
+
+
+class ClientUDPReceiver(UDPReceiver):
+
+    def setsockopt(self, sock):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+
+        # We need these flags to receive udp package and get it's
+        # destination from tproxy redirect.
+        sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+        sock.setsockopt(socket.SOL_IP, IP_RECVORIGDSTADDR, 1)
+        return sock
+
+    def recv(self):
+        ''' receive data from tproxy redirect
+        '''
+
+        pkgs = []
+        events = self._epoll.poll(POLL_TIMEOUT)
+
+        for fd, evt in events:
+            data, anc, flags, src = self._sock.recvmsg(
+                                        UDP_BUFFER_SIZE,
+                                        socket.CMSG_SPACE(24),
+                                    )
+            pkg = UDPPackage(data=data, src_ip=src[0], src_port=src[1])
+            pkgs.append(pkg)
+
+        return pkgs
