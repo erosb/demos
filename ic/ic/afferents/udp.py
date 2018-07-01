@@ -3,6 +3,7 @@
 
 import select
 import socket
+import struct
 
 from ic.pkg import UDPPackage
 
@@ -55,7 +56,10 @@ class UDPReceiver():
 
         for fd, evt in events:
             data, src = self._sock.recvfrom(UDP_BUFFER_SIZE)
-            pkg = UDPPackage(data=data, src_ip=src[0], src_port=src[1])
+            pkg = UDPPackage(
+                      data=data,
+                      src={'addr': src[0], 'port': src[1]}
+                  )
             pkgs.append(pkg)
 
         return pkgs
@@ -80,12 +84,27 @@ class ClientUDPReceiver(UDPReceiver):
         pkgs = []
         events = self._epoll.poll(POLL_TIMEOUT)
 
+        # TODO ipv6 support
         for fd, evt in events:
             data, anc, flags, src = self._sock.recvmsg(
                                         UDP_BUFFER_SIZE,
                                         socket.CMSG_SPACE(24),
                                     )
-            pkg = UDPPackage(data=data, src_ip=src[0], src_port=src[1])
+
+            # get and unpack the cmsg_data field from anc
+            # https://docs.python.org/3/library/socket.html#socket.socket.recvmsg
+            cmsg = struct.unpack('!HHBBBB', anc[0][2][:8])
+
+            dest_port = cmsg[1]
+            dest_addr = '.'.join(
+                [str(u) for u in cmsg[2:]]
+            )
+
+            pkg = UDPPackage(
+                      data=data,
+                      src={'addr': src[0], 'port': src[1]}
+                      dest={'addr': dest_addr, 'port': dest_port}
+                  )
             pkgs.append(pkg)
 
         return pkgs

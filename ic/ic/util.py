@@ -30,6 +30,10 @@ class ObjectifiedDict():
         for key, value in kwargs.items():
             self.__dict__[key] = self.__convert(value)
 
+    def __update__(self, **kwargs):
+        for key, value in kwargs.items():
+            self.__dict__[key] = self.__convert(value)
+
     def __iter__(self):
         return iter(
             self.__dict__.items()

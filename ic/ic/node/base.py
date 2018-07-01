@@ -34,22 +34,20 @@ class BaseNode():
     This class contains common functionalities for all kinds of nodes.
     '''
 
-    def __init__(self, config):
+    def __init__(self, config, role):
         self.config = config
-
-        self.role = None
+        self.role = role
         self.running = False
 
-        self.efferent = UDPTransmitter(config)
-        self.protocol_wrapper = ProtocolWrapper(config)
-
-    def set_role(self, role):
-        self.role = role
-
-        self.afferent_cls = AFFERENT_MAPPING[role]
+    def load_modules(self):
+        self.afferent_cls = AFFERENT_MAPPING[self.role]
         self.afferent = afferent_cls(self.config)
 
-        self.logic_handler_cls = LOGIC_HANDLER_MAPPING[role]
+        self.efferent = UDPTransmitter(config)
+
+        self.protocol_wrapper = ProtocolWrapper(config)
+
+        self.logic_handler_cls = LOGIC_HANDLER_MAPPING[self.role]
         self.logic_handler = self.logic_handler_cls(self.config)
 
     def run(self):
