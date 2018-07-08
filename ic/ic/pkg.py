@@ -10,7 +10,10 @@ class UDPPackage(ObjectifiedDict):
 
     Inner Data Structure:
         {
+            valid: bool or None,
+            type: str,
             data: bytes,
+            fields: ObjectifiedDict,
             src: {
                 addr: str,
                 port: int,
@@ -24,6 +27,13 @@ class UDPPackage(ObjectifiedDict):
                 port: int,
             },
         }
+
+    By default, the valid field is None. It should be
+    set during the unpacking if the package is from other node.
+
+    The data field is bytes which is going to transmit or just received.
+
+    The fields field is the data that hasn't been wrapped or has been parsed.
     '''
 
     def __init__(self, **kwargs):
@@ -32,6 +42,9 @@ class UDPPackage(ObjectifiedDict):
                 kwargs.update(
                     {kw: {'addr': None, 'port': None}}
                 )
+
+        if 'valid' not in kwargs:
+            kwargs.update(valid=None)
 
         for key, value in kwargs.items():
             self.__dict__[key] = self.__convert(value)

@@ -39,5 +39,10 @@ class UDPTransmitter():
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return sock
 
-    def transmit(self, pkg, next_hop):
-        self._sock.sendto(pkg, next_hop)
+    def transmit(self, pkg):
+        ''' transmit a package
+
+        :param pkg: ic.pkg.UDPPackage object
+        '''
+
+        self._sock.sendto(pkg.data, pkg.next_hop)
