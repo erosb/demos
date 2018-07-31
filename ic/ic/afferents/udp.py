@@ -29,7 +29,7 @@ class UDPReceiver():
                                           host=self.config.listen_addr,
                                           port=self.config.listen_port,
                                           proto=socket.SOL_UDP,
-                                      )
+                                      )[0]
 
         sock = socket.socket(af, type_, proto)
         sock.setblocking(False)
@@ -71,7 +71,7 @@ class ClientUDPReceiver(UDPReceiver):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 
-        # We need these flags to receive udp package and get it's
+        # We need these options to receive udp package and get it's
         # destination from tproxy redirect.
         sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
         sock.setsockopt(socket.SOL_IP, IP_RECVORIGDSTADDR, 1)
