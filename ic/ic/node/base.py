@@ -6,6 +6,7 @@ import sys
 import signal as sig
 
 from ic.node import ROLES
+from ic.core.common import CommonCore
 from ic.afferents.udp import UDPReceiver, ClientUDPReceiver
 from ic.efferents.udp import UDPTransmitter
 from ic.protocol.v0 import ProtocolWrapper
@@ -42,6 +43,8 @@ class BaseNode():
         self.running = False
 
     def _handle_term(self, signal, sf):
+        self.core.shutdown()
+
         pid_path = self.config.pid_file
         if os.path.isfile(pid_path):
             os.remove(pid_path)
@@ -74,7 +77,7 @@ class BaseNode():
 
     def load_modules(self):
         self.afferent_cls = AFFERENT_MAPPING[self.role]
-        self.afferent = afferent_cls(self.config)
+        self.main_afferent = afferent_cls(self.config)
 
         self.efferent = UDPTransmitter(config)
 
@@ -83,19 +86,16 @@ class BaseNode():
         self.logic_handler_cls = LOGIC_HANDLER_MAPPING[self.role]
         self.logic_handler = self.logic_handler_cls(self.config)
 
-    def handle_pkgs(self, pkgs):
-        pass
-        # for pkg in pkgs:
-            # self.logic_handler.handle_pkg(pkg)
+        self.core = CommonCore(
+                        afferents=[self.main_afferent],
+                        efferent=self.efferent,
+                        logic_handler=self.logic_handler,
+                        protocol_wrapper=self.protocol_wrapper,
+                    )
 
     def run(self):
         self.__running = True
         self.daemonize()
 
-        self.afferent.start()
-        while self.__running:
-            pkgs = self.afferent.recv()
-            if len(pkgs) == 0:
-                continue
-
-            self.handle_pkgs(pkgs)
+        self.load_modules()
+        self.core.run()
