@@ -38,7 +38,7 @@ def load_libcrypto(libpath='libcrypto.so.1.1'):
 
 
 def new_cipher_ctx(cipher_name, key, iv, mod):
-    if not libcrypto:
+    if libcrypto is None:
         raise Exception('libcrypto is not loaded, cannot init cipher')
 
     cipher_ctx = libcrypto.EVP_CIPHER_CTX_new()
@@ -47,7 +47,7 @@ def new_cipher_ctx(cipher_name, key, iv, mod):
              cipher_ctx, cipher, None, key, iv, c_int(mod)
           )
 
-    if bool(r) is False:
+    if bool(res) is False:
         raise Exception('cipher init failed')
     return cipher_ctx, cipher
 

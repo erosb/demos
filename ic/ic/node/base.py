@@ -9,7 +9,7 @@ from ic.node import ROLES
 from ic.core.common import CommonCore
 from ic.afferents.udp import UDPReceiver, ClientUDPReceiver
 from ic.efferents.udp import UDPTransmitter
-from ic.protocol.v0 import ProtocolWrapper
+from ic.protocol.v0 import ProtocolWrapper, DataPkgFormat, CtrlPkgFormat
 from ic.logic.client import ClientLogicHandler
 from ic.logic.controller import ControllerLogicHandler
 from ic.logic.outlet import OutletLogicHandler
@@ -81,7 +81,11 @@ class BaseNode():
 
         self.efferent = UDPTransmitter(config)
 
-        self.protocol_wrapper = ProtocolWrapper(config)
+        self.protocol_wrapper = ProtocolWrapper(
+                                    config,
+                                    DataPkgFormat,
+                                    CtrlPkgFormat
+                                )
 
         self.logic_handler_cls = LOGIC_HANDLER_MAPPING[self.role]
         self.logic_handler = self.logic_handler_cls(self.config)

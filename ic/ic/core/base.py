@@ -64,8 +64,25 @@ class BaseCore():
         self._epoll.unregister(fd)
         self.afferent_mapping.pop(fd)
 
+    def handle_pkg(self, pkg):
+        pkg = self.protocol_wrapper.unwrap(pkg)
+        pkg = self.logic_handler.handle_logic(pkg)
+        pkg = self.protocol_wrapper.wrap(pkg)
+        self.efferent.transmit(pkg)
+
     def run(self):
-        pass
+        self.__running = True
+        while self.__running:
+            events = self._epoll.poll(POLL_TIMEOUT)
+            for fd, evt in events:
+                afferent = self.afferent_mapping[fd]
+
+                if evt & select.EPOLLERR:
+                    self.unplug_afferent(fd)
+                    afferent.distory()
+                elif evt & select.EPOLLIN:
+                    pkg = afferent.recv()
+                    self.handle_pkg(pkg)
 
     def shutdown(self):
-        pass
+        self.__running = False

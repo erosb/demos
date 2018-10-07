@@ -37,7 +37,7 @@ class Cryptor(object):
         self._cipher_name = cipher_name
         self._cipher_cls = supported_cipher.get(cipher_name)
 
-        if not self._cipher_cls:
+        if self._cipher_cls is None:
             raise Exception('unsupported cipher name')
 
         self._init_ciphers()
