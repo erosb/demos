@@ -2,7 +2,7 @@
 # coding: utf-8
 
 from ic.protocol.crypto.openssl import OpenSSLCryptor, load_libcrypto
-from ic.util import HashTools
+from ic.utils import HashTools
 
 
 openssl_ciphers = {

@@ -3,8 +3,8 @@
 
 import struct
 
-from ic.util import ObjectifiedDict
 from ic.pkg import UDPPackage, PkgTypes, FieldTypes
+from ic.utils import ObjectifiedDict
 from ic.exceptions import (
     PkgWrappingError,
     PkgUnwrappingError,
@@ -170,7 +170,7 @@ class BaseProtocolWrapper():
 
         :param data: bytes
         :param pkg_fmt: the format definition class
-        :return: ic.util.ObjectifiedDict object
+        :return: ic.utils.ObjectifiedDict object
         '''
 
         cur = 0   # cursor

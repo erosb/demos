@@ -34,7 +34,7 @@ def load_libcrypto(libpath='libcrypto.so.1.1'):
         ]
 
         lib_loaded = True
-        logging.info('Successfully loaded crypto library from %s' % libpath)
+        logging.info('Successfully loaded crypto library from {libpath}')
 
 
 def new_cipher_ctx(cipher_name, key, iv, mod):

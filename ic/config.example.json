@@ -1,0 +1,15 @@
+{
+	"listen_addr": "0.0.0.0",
+	"listen_port": 17151,
+	"ipv6": false,
+
+	"salt_len": 8,
+	"crypto_lib_path": "/usr/local/lib/libcrypto.so.1.1",
+
+	"shm_socket_dir": "/var/run/ic_shm",
+	"shm_manager_socket_name": "manager",
+
+	"log_level": "info",
+	"shm_log_path": "/var/log/ic_shm.log",
+	"main_log_path": "/var/log/ic.log"
+}

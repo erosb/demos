@@ -3,7 +3,7 @@
 
 import json
 
-from ic.util import ObjectifiedDict
+from ic.utils import ObjectifiedDict
 
 
 class ConfigLoader():

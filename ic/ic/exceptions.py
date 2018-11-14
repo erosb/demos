@@ -25,3 +25,23 @@ class SwitchPkgFmt(Exception):
 
 class InvalidPkg(Exception):
     pass
+
+
+class AddressAlreadyInUse(Exception):
+    pass
+
+
+class SharedMemoryError(Exception):
+    pass
+
+
+class SHMWorkerNotConnected(SharedMemoryError):
+    pass
+
+
+class SHMWorkerConnectFailed(SharedMemoryError):
+    pass
+
+
+class SHMResponseTimeout(SharedMemoryError):
+    pass

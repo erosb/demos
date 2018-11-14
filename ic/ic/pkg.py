@@ -1,7 +1,7 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-from ic.util import ObjectifiedDict
+from ic.utils import ObjectifiedDict
 
 
 class PkgTypes:
@@ -26,6 +26,7 @@ class FieldTypes:
 class UDPPackage(ObjectifiedDict):
 
     ''' The UDP Package
+    (Or packet? But I'm prefer package than packet. Well, that's not matter)
 
     Inner Data Structure:
         {

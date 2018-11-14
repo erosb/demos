@@ -1,8 +1,8 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-from ic.util import ObjectifiedDict
 from ic.pkg import FieldTypes, PkgTypes
+from ic.utils import ObjectifiedDict
 from ic.protocol.base import BaseProtocolWrapper
 from ic.exceptions import SwitchPkgFmt, InvalidPkg
 
