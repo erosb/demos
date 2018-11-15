@@ -1,4 +1,2 @@
-1. 制作 UDP 接收器
-2. 完成 afferents 和 efferents 层
-3. 研究最优路由算法
-4. 编写 logic 第一版
+1. 编写 logic 第一版
+2. 研究最优路由算法

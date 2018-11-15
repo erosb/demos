@@ -17,6 +17,14 @@ from ic.exceptions import (
 from ic.utils import MetaEnum, ObjectifiedDict, gen_uuid
 
 
+__all__ = [
+    'Actions',
+    'ContainerTypes',
+    'SharedMemoryManager',
+]
+
+
+
 ''' The shared memory module
 
 For keeping consistency of some resources, I decided to make a
@@ -105,6 +113,7 @@ The protocol of communication:
 logger = logging.getLogger('SHM')
 
 
+POLL_TIMEOUT = 4
 UDP_BUFFER_SIZE = 65535
 
 # The max blocing time at the client side of the SharedMemoryManager
@@ -241,10 +250,7 @@ class SharedMemoryManager():
         else:
             return value
 
-    def add_value(self, key, values):
-        ''' add values to a container
-        '''
-
+    def _add_value_2_container(self, key, values):
         container = self.resources[key]
         type_ = type(container)
 
@@ -259,7 +265,7 @@ class SharedMemoryManager():
         if type_ is dict:
             container.update(values)
 
-    def remove_value(self, key, *values):
+    def _remove_value_from_container(self, key, *values):
         ''' remove values from a container
 
         :param values: multipurpose parameter, when the type is dict, it will
@@ -299,13 +305,13 @@ class SharedMemoryManager():
         }
 
     def handle_connect(self, data):
-        resp_sock = data.socket
+        resp_sock_path = os.path.join(self.socket_dir, data.socket)
         conn_id = self.gen_conn_id()
         sock = self._create_socket()
         conn = Connection(
                    conn_id=conn_id,
                    socket=sock,
-                   resp_socket=resp_sock,
+                   resp_socket=resp_sock_path,
                )
 
         self.save_connection(conn_id, conn)
@@ -349,7 +355,7 @@ class SharedMemoryManager():
             if type_ <= ContainerTypes.BOOL:
                 self.resources[key] = value
             else:
-                self.add_value(key, value)
+                self._add_value_2_container(key, value)
 
         return self.gen_response_json(conn_id=conn_id, succeeded=True)
 
@@ -369,7 +375,7 @@ class SharedMemoryManager():
         conn_id = data.conn_id
 
         try:
-            self.add_value(key, value)
+            self._add_value_2_container(key, value)
         except (TypeError, ValueError):
             return self.gen_response_json(conn_id=conn_id, succeeded=False)
         else:
@@ -393,7 +399,7 @@ class SharedMemoryManager():
 
         if key in self.resources:
             try:
-                self.remove_value(key, *value)
+                self._remove_value_from_container(key, *value)
                 return self.gen_response_json(conn_id=conn_id, succeeded=True)
             except TypeError:
                 pass
@@ -417,21 +423,21 @@ class SharedMemoryManager():
             return
 
         if data.action == Actions.CONNECT:
-            return handle_connect(data)
+            return self.handle_connect(data)
         if data.action == Actions.DISCONNECT:
-            return handle_disconnect(data)
+            return self.handle_disconnect(data)
         if data.action == Actions.CREATE:
-            return handle_create(data)
+            return self.handle_create(data)
         if data.action == Actions.READ:
-            return handle_read(data)
+            return self.handle_read(data)
         if data.action == Actions.ADD:
-            return handle_add(data)
+            return self.handle_add(data)
         if data.action == Actions.CLEAN:
-            return handle_clean(data)
+            return self.handle_clean(data)
         if data.action == Actions.REMOVE:
-            return handle_remove(data)
+            return self.handle_remove(data)
 
-    def handle_responding(resp):
+    def handle_responding(self, resp):
         ''' handle responding
 
         send back the response through the given socket
@@ -555,7 +561,7 @@ class SharedMemoryManager():
             raise SHMWorkerNotConnected(MSG_NOT_CONNECTED)
 
         try:
-            data, address = sock.recvfrom(UDP_BUFFER_SIZE)
+            data, address = conn.socket.recvfrom(UDP_BUFFER_SIZE)
             data = json.loads(data.decode('utf-8'))
             if not isinstance(data, dict):
                 raise ValueError
@@ -567,3 +573,47 @@ class SharedMemoryManager():
         except (UnicodeDecodeError, ValueError):
             logger.error(MSG_INVALID_DATA)
             sys.exit(1)
+
+    def create_key(self, key, type_, value=None):
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.CREATE,
+            key=key,
+            type=type_,
+            value=value,
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def add_value(self, key, *values):
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.ADD,
+            key=key,
+            value=list(values),
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def remove_value(self, key, *values):
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.REMOVE,
+            key=key,
+            value=list(values),
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def read_key(self, key):
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.READ,
+            key=key,
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def clean_key(self, key):
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.CLEAN,
+            key=key,
+        )
+        return self.read_response(self.current_connection.conn_id)
