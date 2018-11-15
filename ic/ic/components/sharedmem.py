@@ -19,28 +19,34 @@ from ic.utils import MetaEnum, ObjectifiedDict, gen_uuid
 
 ''' The shared memory module
 
-For keeping consistency of some important resources, I decided to make a
+For keeping consistency of some resources, I decided to make a
 special worker that aimed on processing shared resources.
 
-This shared memory manager is designed to communicate with other workers
+This SharedMemoryManager is not only the resource managing worker but also
+the resource accessing client, it plays 2 roles simultaneously.
+
+The SharedMemoryManager worker is designed to communicate with the client
 by the socket-based IPC, and it shall only support the Unix domain socket.
 
 And it's not necessary to make this communication become encrypted. We can
-simply solve the security problem by using the linux permission mechanism.
+simply solve the security problem by using the permission mechanism of Linux.
 
 
 The protocol of communication:
-    The choice of transport layer protocol is UDP. UDP is much easier to
-    handle than TCP, and in the case of local communication, UDP is reliable.
+    The choice of transport layer protocol is UDP. UDP is much easier to handle
+    than TCP, and in the case of local communication, UDP is reliable (because
+    we don't need to keep UDP packets in-sequence, and it's nearly impossible
+    to loss a UDP packet in local communication).
+
     And because of the feature of the UDP Unix domain socket, we cannot
     simply send back responses through the socket. So we need do a fake
-    connection in with UDP sockets.
+    connection with UDP sockets.
 
     Before the data accessing requests are sent out, the client needs to offer
     an unique socket name and listen on it, and the manager will send back
     responses through this socket.
 
-    Then, we simply transfer stringified JSON through the socket.
+    Then, we can simply transfer stringified JSON through the socket.
 
 
     JSON structures in request:
