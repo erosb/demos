@@ -3,7 +3,9 @@
 
 import os
 import sys
+import time
 import signal as sig
+import logging
 
 from ic.node import ROLES
 from ic.core.common import CommonCore
@@ -14,6 +16,10 @@ from ic.logic.client import ClientLogicHandler
 from ic.logic.controller import ControllerLogicHandler
 from ic.logic.outlet import OutletLogicHandler
 from ic.logic.relay import RelayLogicHandler
+from ic.components.sharedmem import SharedMemoryManager
+
+
+logger = logging.getLogger('main')
 
 
 AFFERENT_MAPPING = {
@@ -30,52 +36,113 @@ LOGIC_HANDLER_MAPPING = {
 }
 
 
+TERM_SIGNALS = [sig.SIGINT, sig.SIGQUIT, sig.SIGTERM]
+
+
 class BaseNode():
 
     ''' The Base Class of Nodes
-
-    This class contains common functionalities for all kinds of nodes.
     '''
 
     def __init__(self, config, role):
         self.config = config
         self.role = role
-        self.running = False
+        self.worker_pids = []
+        self.shm_worker_pid = None
 
-    def _handle_term(self, signal, sf):
-        self.core.shutdown()
+    def _handle_term_master(self, signal, sf):
+        self.shutdown_workers()
 
         pid_path = self.config.pid_file
         if os.path.isfile(pid_path):
             os.remove(pid_path)
         sys.exit(0)
 
+    def _handle_term_worker(self, signal, sf):
+        self.core.shutdown()
+
+    def _handle_term_shm(self, signal, sf):
+        self.shm_mgr.shutdown_worker()
+
+    def _sig_master(self):
+        sig.signal(sig.SIGHUP, sig.SIG_IGN)
+        for s in TERM_SIGNALS:
+            sig.signal(s, self._handle_term_master)
+
+    def _sig_normal_worker(self):
+        sig.signal(sig.SIGHUP, sig.SIG_IGN)
+        for s in TERM_SIGNALS:
+            sig.signal(s, self._handle_term_worker)
+
+    def _sig_shm_worker(self):
+        sig.signal(sig.SIGHUP, sig.SIG_IGN)
+        for s in TERM_SIGNALS:
+            sig.signal(s, self._handle_term_shm)
+
+    def shutdown_workers(self):
+        for pid in self.worker_pids:
+            self._kill(pid)
+
+        # wait for workers to exit
+        remaining = self.worker_pids
+        while True:
+            for pid in list(remaining):
+                if _process_exists(pid):
+                    os.waitpid(pid, os.WNOHANG)
+                else:
+                    remaining.remove(pid)
+
+            if len(remaining) == 0:
+                break
+
+            time.sleep(0.1)
+
+        # shutdown SharedMemoryManager worker at last
+        self._kill(self.shm_worker_pid)
+        os.waitpid(self.shm_worker_pid, 0)
+
+    def _kill(self, pid):
+        try:
+            os.kill(pid, sig.SIGTERM)
+        except ProcessLookupError:
+            pass
+
+    def _process_exists(self, pid):
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        else:
+            return True
+
     def daemonize(self):
         pid = os.fork()
-
         if pid == -1: 
-            raise OSError('Fork failed when doing daemonize')
+            raise OSError('fork failed when doing daemonize')
+        elif pid > 0:
+            # double fork magic
+            sys.exit(0)
+
+        pid = os.fork()
+        if pid == -1: 
+            raise OSError('fork failed when doing daemonize')
 
         def quit(sg, sf):
             sys.exit(0)
 
-        term_signals = [sig.SIGINT, sig.SIGQUIT, sig.SIGTERM]
         if pid > 0:
-            for s in term_signals:
+            for s in TERM_SIGNALS:
                 sig.signal(s, quit)
-
-            # wait for the SIGTERM from subprocess
             time.sleep(5)
         else:
-            sig.signal(sig.SIGHUP, sig.SIG_IGN)
-            for s in term_signals:
-                sig.signal(s, self._handle_term)
-
+            self._sig_master()
             ppid = os.getppid()
             os.kill(ppid, sig.SIGTERM)
             os.setsid()
 
     def load_modules(self):
+        self.shm_mgr = SharedMemoryManager(self.config)
+
         self.afferent_cls = AFFERENT_MAPPING[self.role]
         self.main_afferent = afferent_cls(self.config)
 
@@ -98,8 +165,33 @@ class BaseNode():
                     )
 
     def run(self):
-        self.__running = True
         self.daemonize()
-
         self.load_modules()
-        self.core.run()
+
+        # start SharedMemoryManager worker
+        pid = os.fork()
+        if pid == -1:
+            raise OSError('fork failed')
+        elif pid == 0:
+            self._sig_shm_worker()
+            self.shm_mgr.run_as_worker()
+            return  # the sub-process ends here
+        else:
+            self.shm_worker_pid = pid
+
+        # start normal workers
+        worker_amount = self.config.worker_amount
+        for _ in range(worker_amount):
+            pid = os.fork()
+
+            if pid == -1:
+                raise OSError('fork failed')
+            elif pid == 0:
+                self._sig_normal_worker()
+                self.core.run()
+                return  # the sub-process ends here
+            else:
+                self.worker_pids.append(pid)
+
+        os.waitpid(-1, 0)
+        logger.info('Node exits.')
