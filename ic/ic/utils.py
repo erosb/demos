@@ -59,27 +59,29 @@ class ObjectifiedDict():
         self.__container__.clear()
 
     @staticmethod
-    def __to_dumpable__(item):
+    def __to_dumpable__(item, keep_bytes=True):
         if item.__class__ is bytes:
-            return f'<bytes length={len(item)}>'
+            return item if keep_bytes else f'<bytes length={len(item)}>'
         elif isinstance(item, ObjectifiedDict):
-            return item.__str_assist__()
+            return item.__to_dict__(keep_bytes)
         elif item.__class__ in (list, tuple, set):
             return [ObjectifiedDict.__to_dumpable__(unit) for unit in item]
+        elif item.__class__ == bool:
+            return item
         elif item.__class__ not in (int, str, None):
             return str(item)
 
         return item
 
-    def __str_assist__(self):
+    def __to_dict__(self, keep_bytes=True):
         d = {}
         for key, value in self.__container__.items():
-            d[key] = self.__to_dumpable__(value)
+            d[key] = self.__to_dumpable__(value, keep_bytes)
         return d
 
     def __str__(self):
         return json.dumps(
-            self.__str_assist__(), indent=4
+            self.__to_dict__(keep_bytes=False), indent=4
         )
 
 

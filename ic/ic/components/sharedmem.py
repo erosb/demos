@@ -182,7 +182,7 @@ COMPATIBLE_TYPE_MAPPING = {
     ContainerTypes.BOOL: bool,
     ContainerTypes.SET: list,
     ContainerTypes.LIST: list,
-    ContainerTypes.DICT: dict,
+    ContainerTypes.DICT: ObjectifiedDict,
 }
 
 
@@ -252,18 +252,23 @@ class SharedMemoryManager():
 
     def _add_value_2_container(self, key, values):
         container = self.resources[key]
-        type_ = type(container)
+        container_type = type(container)
 
-        if type_ is set:
+        if container_type is set:
             for value in values:
                 container.add(value)
 
-        if type_ is list:
+        if container_type is list:
             for value in values:
                 container.append(value)
 
-        if type_ is dict:
-            container.update(values)
+        if container_type is dict:
+            if isinstance(values, dict):
+                container.update(values)
+            elif isinstance(values, ObjectifiedDict):
+                container.update(values.__to_dict__())
+            else:
+                raise TypeError
 
     def _remove_value_from_container(self, key, *values):
         ''' remove values from a container
@@ -276,7 +281,7 @@ class SharedMemoryManager():
         container = self.resources[key]
         type_ = type(container)
 
-        if type_ in (set or list):
+        if type_ in (set, list):
             for value in values:
                 try:
                     container.remove(value)
@@ -287,15 +292,15 @@ class SharedMemoryManager():
             for value in values:
                 container.pop(value, None)
 
-    def save_connection(self, conn_id, conn):
+    def _save_connection(self, conn_id, conn):
         self.connections.update(
             {conn_id: conn}
         )
 
-    def remove_connection(self, conn_id):
+    def _remove_connection(self, conn_id):
         self.connections.pop(conn_id, None)
 
-    def gen_response_json(self, conn_id, succeeded, value=None):
+    def _gen_response_json(self, conn_id, succeeded, value=None):
         return {
             'conn_id': conn_id,
             'data': {
@@ -314,7 +319,7 @@ class SharedMemoryManager():
                    resp_socket=resp_sock_path,
                )
 
-        self.save_connection(conn_id, conn)
+        self._save_connection(conn_id, conn)
 
         return {
             'conn_id': conn_id,
@@ -326,7 +331,7 @@ class SharedMemoryManager():
         }
 
     def handle_disconnect(self, data):
-        self.remove_connection(data.conn_id)
+        self._remove_connection(data.conn_id)
         return None
 
     def handle_create(self, data):
@@ -336,14 +341,14 @@ class SharedMemoryManager():
         conn_id = data.conn_id
         compatible_type = COMPATIBLE_TYPE_MAPPING.get(type_)
 
-        if (
+        if value is not None and (
             (type_ not in ContainerTypes) or
             (
                 type_ in ContainerTypes and
                 not isinstance(value, compatible_type)
             )
         ):
-            return self.gen_response_json(conn_id=conn_id, succeeded=False)
+            return self._gen_response_json(conn_id=conn_id, succeeded=False)
 
         py_type = PY_TYPE_MAPPING.get(type_)
         container = py_type()
@@ -357,13 +362,13 @@ class SharedMemoryManager():
             else:
                 self._add_value_2_container(key, value)
 
-        return self.gen_response_json(conn_id=conn_id, succeeded=True)
+        return self._gen_response_json(conn_id=conn_id, succeeded=True)
 
     def handle_read(self, data):
         conn_id = data.conn_id
         key = data.key
 
-        return self.gen_response_json(
+        return self._gen_response_json(
             conn_id=conn_id,
             succeeded=True,
             value=self.get_compatible_value(key),
@@ -377,9 +382,9 @@ class SharedMemoryManager():
         try:
             self._add_value_2_container(key, value)
         except (TypeError, ValueError):
-            return self.gen_response_json(conn_id=conn_id, succeeded=False)
+            return self._gen_response_json(conn_id=conn_id, succeeded=False)
         else:
-            return self.gen_response_json(conn_id=conn_id, succeeded=True)
+            return self._gen_response_json(conn_id=conn_id, succeeded=True)
 
     def handle_clean(self, data):
         key = data.key
@@ -388,9 +393,9 @@ class SharedMemoryManager():
 
         if key in self.resources:
             self.resources.pop(key)
-            return self.gen_response_json(conn_id=conn_id, succeeded=True)
+            return self._gen_response_json(conn_id=conn_id, succeeded=True)
         else:
-            return self.gen_response_json(conn_id=conn_id, succeeded=False)
+            return self._gen_response_json(conn_id=conn_id, succeeded=False)
 
     def handle_remove(self, data):
         key = data.key
@@ -400,11 +405,11 @@ class SharedMemoryManager():
         if key in self.resources:
             try:
                 self._remove_value_from_container(key, *value)
-                return self.gen_response_json(conn_id=conn_id, succeeded=True)
+                return self._gen_response_json(conn_id=conn_id, succeeded=True)
             except TypeError:
                 pass
 
-        return self.gen_response_json(conn_id=conn_id, succeeded=False)
+        return self._gen_response_json(conn_id=conn_id, succeeded=False)
 
     def handle_request(self, data):
         try:
@@ -477,7 +482,8 @@ class SharedMemoryManager():
                     self.handle_responding(resp)
 
         self._worker_sock.close()
-        logger.info('SharedMemoryManager Worker exited')
+        os.remove(self.worker_socket_path)
+        logger.info('SharedMemoryManager Worker exited successfully')
 
     def shutdown_worker(self):
         if self.__running:
@@ -487,6 +493,7 @@ class SharedMemoryManager():
             logger.error(msg)
             raise RuntimeError(msg)
 
+    ## Methods below will be used by the client side
     def connect(self, socket_name):
         ''' Connect to the SharedMemoryManager worker
 

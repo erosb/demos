@@ -5,7 +5,7 @@ import unittest
 
 import __code_path__
 from ic.pkg import UDPPackage
-from ic.util import ObjectifiedDict
+from ic.utils import ObjectifiedDict
 from ic.protocol.v0 import ProtocolWrapper
 from ic.protocol.v0 import DataPkgFormat, CtrlPkgFormat
 
