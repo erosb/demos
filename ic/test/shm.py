@@ -3,6 +3,7 @@
 
 import os
 import time
+import signal as sig
 import shutil
 import unittest
 
@@ -71,8 +72,8 @@ class SHMTest(unittest.TestCase):
         else:
             # wait for worker
             time.sleep(1)
-
             worker_pid = pid
+
             shm_mgr = SharedMemoryManager(config)
             shm_mgr.connect('test')
             print('conn_id: ', shm_mgr.current_connection.conn_id)
@@ -106,6 +107,7 @@ class SHMTest(unittest.TestCase):
 
             shm_mgr.disconnect()
             self.assertEqual(shm_mgr.current_connection, None)
+            os.kill(worker_pid, sig.SIGTERM)
 
 
 if __name__ == '__main__':
