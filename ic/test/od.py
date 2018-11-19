@@ -5,7 +5,7 @@ import json
 import unittest
 
 import __code_path__
-from ic.utils import ObjectifiedDict
+from neverland.utils import ObjectifiedDict
 
 
 # Test case for ObjectifiedDict

@@ -2,7 +2,7 @@
 #coding: utf-8
 
 
-from ic.node.base import BaseNode
+from neverland.node.base import BaseNode
 
 
 class ClientNode(BaseNode):

@@ -4,10 +4,10 @@
 import unittest
 
 import __code_path__
-from ic.pkg import UDPPackage
-from ic.utils import ObjectifiedDict
-from ic.protocol.v0 import ProtocolWrapper
-from ic.protocol.v0 import DataPkgFormat, CtrlPkgFormat
+from neverland.pkg import UDPPackage
+from neverland.utils import ObjectifiedDict
+from neverland.protocol.v0 import ProtocolWrapper
+from neverland.protocol.v0 import DataPkgFormat, CtrlPkgFormat
 
 
 config = ObjectifiedDict()

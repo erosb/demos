@@ -8,13 +8,13 @@ import select
 import socket
 import logging
 
-from ic.exceptions import (
+from neverland.exceptions import (
     AddressAlreadyInUse,
     SHMResponseTimeout,
     SHMWorkerNotConnected,
     SHMWorkerConnectFailed,
 )
-from ic.utils import MetaEnum, ObjectifiedDict, gen_uuid
+from neverland.utils import MetaEnum, ObjectifiedDict, gen_uuid
 
 
 __all__ = [

@@ -42,7 +42,7 @@ class UDPTransmitter():
     def transmit(self, pkg):
         ''' transmit a package
 
-        :param pkg: ic.pkg.UDPPackage object
+        :param pkg: neverland.pkg.UDPPackage object
         '''
 
         self._sock.sendto(pkg.data, pkg.next_hop)

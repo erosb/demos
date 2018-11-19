@@ -3,9 +3,9 @@
 
 import struct
 
-from ic.pkg import UDPPackage, PkgTypes, FieldTypes
-from ic.utils import ObjectifiedDict
-from ic.exceptions import (
+from neverland.pkg import UDPPackage, PkgTypes, FieldTypes
+from neverland.utils import ObjectifiedDict
+from neverland.exceptions import (
     PkgWrappingError,
     PkgUnwrappingError,
     InvalidPkg,
@@ -23,7 +23,7 @@ class BasePkgFormat():
 
     The format of the __fmt__ dict:
         {
-            'field_name': (length, type),  #type is listed in ic.pkg.FieldTypes
+            'field_name': (length, type),  #type is listed in neverland.pkg.FieldTypes
         }
 
     This kind of classes depends on the ordered dict feature which implemented
@@ -49,7 +49,7 @@ class BaseProtocolWrapper():
 
     ''' The ProtocolWrapper class
 
-    This kind of classes are responsible for converting the ic.pkg.UDPPackage
+    This kind of classes are responsible for converting the neverland.pkg.UDPPackage
     object into real UDP packages (bytes) which could be a valid UDP package
     that can be forwarded by IC nodes.
     '''
@@ -70,8 +70,8 @@ class BaseProtocolWrapper():
     def wrap(self, pkg):
         ''' make a valid IC UDP package
 
-        :param pkg: ic.pkg.UDPPackage object
-        :return: ic.pkg.UDPPackage object
+        :param pkg: neverland.pkg.UDPPackage object
+        :return: neverland.pkg.UDPPackage object
         '''
 
         pkg_fmt = self._fmt_mapping.get(pkg.type)
@@ -82,7 +82,7 @@ class BaseProtocolWrapper():
     def make_udp_pkg(self, data, pkg_fmt):
         ''' make a valid IC UDP package
 
-        :param data: the "fields" attribute of ic.pkg.UDPPackage object
+        :param data: the "fields" attribute of neverland.pkg.UDPPackage object
         :param pkg_fmt: the format definition class
         :return: bytes
         '''
@@ -99,7 +99,7 @@ class BaseProtocolWrapper():
         ''' pack a single field
 
         :param value: value of the field
-        :param field_type: type of the field, choosed from ic.pkg.FieldTypes
+        :param field_type: type of the field, choosed from neverland.pkg.FieldTypes
         :return: bytes
         '''
 
@@ -132,8 +132,8 @@ class BaseProtocolWrapper():
     def unwrap(self, pkg):
         ''' unpack a raw UDP package
 
-        :param pkg: ic.pkg.UDPPackage object
-        :return: ic.pkg.UDPPackage object
+        :param pkg: neverland.pkg.UDPPackage object
+        :return: neverland.pkg.UDPPackage object
         '''
 
         # if the pkg type has been determined, then we simply use it,
@@ -170,7 +170,7 @@ class BaseProtocolWrapper():
 
         :param data: bytes
         :param pkg_fmt: the format definition class
-        :return: ic.utils.ObjectifiedDict object
+        :return: neverland.utils.ObjectifiedDict object
         '''
 
         cur = 0   # cursor
@@ -198,7 +198,7 @@ class BaseProtocolWrapper():
         ''' unpack a single field
 
         :param data: bytes
-        :param field_type: type of the field, choosed from ic.pkg.FieldTypes
+        :param field_type: type of the field, choosed from neverland.pkg.FieldTypes
         :return: the unpacked value
         '''
 

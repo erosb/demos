@@ -13,10 +13,10 @@ class BaseCore():
     Some components are plugable, and some others are necessary.
 
     Here is the list of all plugable components:
-        afferents in ic.afferents, plugable
-        efferents in ic.efferents, necessary
-        logic handlers in ic.logic, necessary
-        protocol wrappers in ic.protocol, necessary
+        afferents in neverland.afferents, plugable
+        efferents in neverland.efferents, necessary
+        logic handlers in neverland.logic, necessary
+        protocol wrappers in neverland.protocol, necessary
 
     In the initial version, all these components are necessary, and afferents
     could be multiple.

@@ -3,7 +3,7 @@
 
 import json
 
-from ic.utils import ObjectifiedDict
+from neverland.utils import ObjectifiedDict
 
 
 class ConfigLoader():

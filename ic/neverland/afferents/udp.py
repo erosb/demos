@@ -4,7 +4,7 @@
 import socket
 import struct
 
-from ic.pkg import UDPPackage
+from neverland.pkg import UDPPackage
 
 
 UDP_BUFFER_SIZE = 65535

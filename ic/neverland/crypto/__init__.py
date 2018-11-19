@@ -1,8 +1,8 @@
 #!/usr/bin/python3.6
 # coding: utf-8
 
-from ic.protocol.crypto.openssl import OpenSSLCryptor, load_libcrypto
-from ic.utils import HashTools
+from neverland.crypto.openssl import OpenSSLCryptor, load_libcrypto
+from neverland.utils import HashTools
 
 
 openssl_ciphers = {

@@ -7,16 +7,16 @@ import time
 import signal as sig
 import logging
 
-from ic.node import ROLES
-from ic.core.common import CommonCore
-from ic.afferents.udp import UDPReceiver, ClientUDPReceiver
-from ic.efferents.udp import UDPTransmitter
-from ic.protocol.v0 import ProtocolWrapper, DataPkgFormat, CtrlPkgFormat
-from ic.logic.client import ClientLogicHandler
-from ic.logic.controller import ControllerLogicHandler
-from ic.logic.outlet import OutletLogicHandler
-from ic.logic.relay import RelayLogicHandler
-from ic.components.sharedmem import SharedMemoryManager
+from neverland.node import ROLES
+from neverland.core.common import CommonCore
+from neverland.afferents.udp import UDPReceiver, ClientUDPReceiver
+from neverland.efferents.udp import UDPTransmitter
+from neverland.protocol.v0 import ProtocolWrapper, DataPkgFormat, CtrlPkgFormat
+from neverland.logic.client import ClientLogicHandler
+from neverland.logic.controller import ControllerLogicHandler
+from neverland.logic.outlet import OutletLogicHandler
+from neverland.logic.relay import RelayLogicHandler
+from neverland.components.sharedmem import SharedMemoryManager
 
 
 logger = logging.getLogger('main')

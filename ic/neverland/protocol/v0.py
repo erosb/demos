@@ -1,10 +1,10 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-from ic.pkg import FieldTypes, PkgTypes
-from ic.utils import ObjectifiedDict
-from ic.protocol.base import BaseProtocolWrapper
-from ic.exceptions import SwitchPkgFmt, InvalidPkg
+from neverland.pkg import FieldTypes, PkgTypes
+from neverland.utils import ObjectifiedDict
+from neverland.protocol.base import BaseProtocolWrapper
+from neverland.exceptions import SwitchPkgFmt, InvalidPkg
 
 
 UDP_DATA_LEN = 32768

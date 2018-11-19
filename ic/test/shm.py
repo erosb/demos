@@ -8,8 +8,8 @@ import shutil
 import unittest
 
 import __code_path__
-from ic.utils import ObjectifiedDict
-from ic.components.sharedmem import SharedMemoryManager, ContainerTypes
+from neverland.utils import ObjectifiedDict
+from neverland.components.sharedmem import SharedMemoryManager, ContainerTypes
 
 
 config = ObjectifiedDict(
