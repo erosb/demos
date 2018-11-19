@@ -417,7 +417,7 @@ class SharedMemoryManager():
             if not isinstance(data, dict):
                 raise ValueError
         except (UnicodeDecodeError, ValueError):
-            # If this was the package which we sent, then it could not
+            # If this was the packet which we sent, then it could not
             # cause any of these errors, so we can simply ignore it.
             return
 

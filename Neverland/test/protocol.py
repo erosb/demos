@@ -4,24 +4,24 @@
 import unittest
 
 import __code_path__
-from neverland.pkg import UDPPackage
+from neverland.pkt import UDPPacket
 from neverland.utils import ObjectifiedDict
 from neverland.protocol.v0 import ProtocolWrapper
-from neverland.protocol.v0 import DataPkgFormat, CtrlPkgFormat
+from neverland.protocol.v0 import DataPktFormat, CtrlPktFormat
 
 
 config = ObjectifiedDict()
 config.salt_len = 8
 config.ipv6 = False
 
-base_wrapper = ProtocolWrapper(config, DataPkgFormat, CtrlPkgFormat)
+base_wrapper = ProtocolWrapper(config, DataPktFormat, CtrlPktFormat)
 
 
 class PWTest(unittest.TestCase):
 
     def test_0_wrap_unwrap(self):
-        pkg = UDPPackage()
-        pkg.fields = ObjectifiedDict(
+        pkt = UDPPacket()
+        pkt.fields = ObjectifiedDict(
                          salt=b'a'*8,
                          mac=b'a'*64,
                          serial=1,
@@ -34,24 +34,24 @@ class PWTest(unittest.TestCase):
                          iv_duration=10000,
                          iv=b'iviviviviv'
                      )
-        pkg.type = pkg.fields.type
+        pkt.type = pkt.fields.type
 
-        pkg = base_wrapper.wrap(pkg)
-        print(pkg.data)
+        pkt = base_wrapper.wrap(pkt)
+        print(pkt.data)
         print('==================\n')
 
-        pkg1 = UDPPackage()
-        # pkg1.type = 0x01
-        pkg1.data = pkg.data
-        pkg1 = base_wrapper.unwrap(pkg1)
+        pkt1 = UDPPacket()
+        # pkt1.type = 0x01
+        pkt1.data = pkt.data
+        pkt1 = base_wrapper.unwrap(pkt1)
 
-        self.assertEqual(pkg1.valid, True)
-        self.assertEqual(pkg1.type, 0x02)
-        self.assertEqual(pkg1.fields.src, pkg.fields.src)
-        self.assertEqual(pkg1.fields.dest, pkg.fields.dest)
+        self.assertEqual(pkt1.valid, True)
+        self.assertEqual(pkt1.type, 0x02)
+        self.assertEqual(pkt1.fields.src, pkt.fields.src)
+        self.assertEqual(pkt1.fields.dest, pkt.fields.dest)
 
         print(
-            str(pkg1.fields)
+            str(pkt1.fields)
         )
 
 

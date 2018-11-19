@@ -64,11 +64,11 @@ class BaseCore():
         self._epoll.unregister(fd)
         self.afferent_mapping.pop(fd)
 
-    def handle_pkg(self, pkg):
-        pkg = self.protocol_wrapper.unwrap(pkg)
-        pkg = self.logic_handler.handle_logic(pkg)
-        pkg = self.protocol_wrapper.wrap(pkg)
-        self.efferent.transmit(pkg)
+    def handle_pkt(self, pkt):
+        pkt = self.protocol_wrapper.unwrap(pkt)
+        pkt = self.logic_handler.handle_logic(pkt)
+        pkt = self.protocol_wrapper.wrap(pkt)
+        self.efferent.transmit(pkt)
 
     def run(self):
         self.__running = True
@@ -81,8 +81,8 @@ class BaseCore():
                     self.unplug_afferent(fd)
                     afferent.distory()
                 elif evt & select.EPOLLIN:
-                    pkg = afferent.recv()
-                    self.handle_pkg(pkg)
+                    pkt = afferent.recv()
+                    self.handle_pkt(pkt)
 
     def shutdown(self):
         self.__running = False

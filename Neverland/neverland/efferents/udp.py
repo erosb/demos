@@ -39,10 +39,10 @@ class UDPTransmitter():
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return sock
 
-    def transmit(self, pkg):
-        ''' transmit a package
+    def transmit(self, pkt):
+        ''' transmit a packet
 
-        :param pkg: neverland.pkg.UDPPackage object
+        :param pkt: neverland.pkt.UDPPacket object
         '''
 
-        self._sock.sendto(pkg.data, pkg.next_hop)
+        self._sock.sendto(pkt.data, pkt.next_hop)

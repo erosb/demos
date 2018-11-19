@@ -9,9 +9,9 @@ class OutletNode(BaseNode):
 
     ''' The Outlet Node
 
-    Outlet nodes are the outfall the community where packages from client
-    nodes will get exit. They will transmit packages from client node to
-    the destination server and receive responding packages from the
+    Outlet nodes are the outfall the community where packets from client
+    nodes will get exit. They will transmit packets from client node to
+    the destination server and receive responding packets from the
     destination server and send back them to they relay nodes so that
     the community can complete the communication for the client.
 

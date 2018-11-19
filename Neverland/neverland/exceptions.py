@@ -2,28 +2,28 @@
 #coding: utf-8
 
 
-class PkgWrappingError(Exception):
+class PktWrappingError(Exception):
     pass
 
 
-class PkgUnwrappingError(Exception):
+class PktUnwrappingError(Exception):
     pass
 
 
-class SwitchPkgFmt(Exception):
+class SwitchPktFmt(Exception):
 
-    ''' Switch the package format definition
+    ''' Switch the packet format definition
 
     Used in ProtocolWrapper.
 
-    This exception means that we need to use another package format.
+    This exception means that we need to use another packet format.
 
     Once catched this exception, the upper layer should invoke the method
-    again with another package format definition.
+    again with another packet format definition.
     '''
 
 
-class InvalidPkg(Exception):
+class InvalidPkt(Exception):
     pass
 
 

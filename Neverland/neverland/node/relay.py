@@ -10,7 +10,7 @@ class RelayNode(BaseNode):
     ''' The Relay Node
 
     Relay nodes are the main part of the community.
-    They will forward the packages to where these packages should arrive.
+    They will forward the packets to where these packets should arrive.
 
 
     Model of processes:

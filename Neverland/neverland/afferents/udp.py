@@ -4,7 +4,7 @@
 import socket
 import struct
 
-from neverland.pkg import UDPPackage
+from neverland.pkt import UDPPacket
 
 
 UDP_BUFFER_SIZE = 65535
@@ -45,11 +45,11 @@ class UDPReceiver():
 
     def recv(self):
         data, src = self._sock.recvfrom(UDP_BUFFER_SIZE)
-        pkg = UDPPackage(
+        pkt = UDPPacket(
                   data=data,
                   src={'addr': src[0], 'port': src[1]}
               )
-        return pkg
+        return pkt
 
     @property
     def fd(self):
@@ -62,7 +62,7 @@ class ClientUDPReceiver(UDPReceiver):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 
-        # We need these options to receive udp package and get it's
+        # We need these options to receive udp packet and get it's
         # destination from tproxy redirect.
         sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
         sock.setsockopt(socket.SOL_IP, IP_RECVORIGDSTADDR, 1)
@@ -87,9 +87,9 @@ class ClientUDPReceiver(UDPReceiver):
             [str(u) for u in cmsg[2:]]
         )
 
-        pkg = UDPPackage(
+        pkt = UDPPacket(
                   data=data,
                   src={'addr': src[0], 'port': src[1]}
                   dest={'addr': dest_addr, 'port': dest_port}
               )
-        return pkg
+        return pkt

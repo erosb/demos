@@ -11,7 +11,7 @@ from neverland.node import ROLES
 from neverland.core.common import CommonCore
 from neverland.afferents.udp import UDPReceiver, ClientUDPReceiver
 from neverland.efferents.udp import UDPTransmitter
-from neverland.protocol.v0 import ProtocolWrapper, DataPkgFormat, CtrlPkgFormat
+from neverland.protocol.v0 import ProtocolWrapper, DataPktFormat, CtrlPktFormat
 from neverland.logic.client import ClientLogicHandler
 from neverland.logic.controller import ControllerLogicHandler
 from neverland.logic.outlet import OutletLogicHandler
@@ -150,8 +150,8 @@ class BaseNode():
 
         self.protocol_wrapper = ProtocolWrapper(
                                     config,
-                                    DataPkgFormat,
-                                    CtrlPkgFormat
+                                    DataPktFormat,
+                                    CtrlPktFormat
                                 )
 
         self.logic_handler_cls = LOGIC_HANDLER_MAPPING[self.role]

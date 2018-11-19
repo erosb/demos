@@ -1,21 +1,21 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-from neverland.pkg import FieldTypes, PkgTypes
+from neverland.pkt import FieldTypes, PktTypes
 from neverland.utils import ObjectifiedDict
 from neverland.protocol.base import BaseProtocolWrapper
-from neverland.exceptions import SwitchPkgFmt, InvalidPkg
+from neverland.exceptions import SwitchPktFmt, InvalidPkt
 
 
 UDP_DATA_LEN = 32768
 
 
-class DataPkgFormat():
+class DataPktFormat():
 
-    ''' The format of data packages
+    ''' The format of data packets
     '''
 
-    __type__ = PkgTypes.DATA
+    __type__ = PktTypes.DATA
 
     @classmethod
     def gen_fmt(cls, config):
@@ -29,7 +29,7 @@ class DataPkgFormat():
             # so the length is fixed to 64
             'mac': (64, FieldTypes.PY_BYTES),
 
-            # Each UDP package should have a serial number as its identifier.
+            # Each UDP packet should have a serial number as its identifier.
             # (no matter which type it is)
             # The max value of an 8 bytes long integer is 18446744073709551615.
             # This means that if we send one billion packets per second then we
@@ -37,21 +37,21 @@ class DataPkgFormat():
             # (2 ** 64 - 1) / (1000000000 * 3600 * 24 * 365) == 584.942417355072
             'serial': (8, FieldTypes.STRUCT_U_LONG_LONG),
 
-            # The timestamp of the creation of the package
+            # The timestamp of the creation of the packet
             'time': (8, FieldTypes.STRUCT_U_LONG_LONG),
 
-            # Package type, 0x01 for data packages and 0x02 for controlling pkgs
+            # Packet type, 0x01 for data packets and 0x02 for controlling pkts
             'type': (1, FieldTypes.STRUCT_U_CHAR),
 
-            # Whether this package has been diverged,
+            # Whether this packet has been diverged,
             # 0x01 for True and 0x02 for False
             'diverged': (1, FieldTypes.STRUCT_U_CHAR),
 
-            # The source of the package
+            # The source of the packet
             # TODO ipv6 support
             'src': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
 
-            # The destination of the package
+            # The destination of the packet
             # TODO ipv6 support
             'dest': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
 
@@ -60,12 +60,12 @@ class DataPkgFormat():
         }
 
 
-class CtrlPkgFormat():
+class CtrlPktFormat():
 
-    ''' The format of the controlling packages
+    ''' The format of the controlling packets
     '''
 
-    __type__ = PkgTypes.CTRL
+    __type__ = PktTypes.CTRL
 
     @classmethod
     def gen_fmt(cls, config):
@@ -84,7 +84,7 @@ class CtrlPkgFormat():
             # 0x01 for Ture and 0x02 for False
             'iv_changed': (1, FieldTypes.STRUCT_U_CHAR),
 
-            # The amount of packages that can be encrypted by this iv
+            # The amount of packets that can be encrypted by this iv
             'iv_duration': (8, FieldTypes.STRUCT_U_LONG_LONG),
 
             # The iv
@@ -94,44 +94,44 @@ class CtrlPkgFormat():
 
 class ProtocolWrapper(BaseProtocolWrapper):
 
-    def parse_udp_pkg(self, data, pkg_fmt):
-        ''' override the parse_udp_pkg method
+    def parse_udp_pkt(self, data, pkt_fmt):
+        ''' override the parse_udp_pkt method
 
-        We need to determine the type of packages.
-        In this version of protocol, the first 7 fields in data packages and
-        control packages are same, so we can simply look for the "type" field.
+        We need to determine the type of packets.
+        In this version of protocol, the first 7 fields in data packets and
+        control packets are same, so we can simply look for the "type" field.
 
-        Raise SwitchPkgFmt when we need another type of pkg_fmt.
+        Raise SwitchPktFmt when we need another type of pkt_fmt.
 
-        Well, actually, the pkg_fmt argument will always be the data_pkg_fmt.
-        Once we raise the SwitchPkgFmt, the upper layer will use ctrl_pkg_fmt
-        instead. Currently, we have only 2 class of pkg_fmt
+        Well, actually, the pkt_fmt argument will always be the data_pkt_fmt.
+        Once we raise the SwitchPktFmt, the upper layer will use ctrl_pkt_fmt
+        instead. Currently, we have only 2 class of pkt_fmt
         '''
 
         cur = 0
         fields = ObjectifiedDict()
 
-        for field_name, definition in pkg_fmt.__fmt__.items():
+        for field_name, definition in pkt_fmt.__fmt__.items():
             length, type_ = definition
 
             field_data = data[cur: cur + length]
-            # Package too short, it must be invalid
+            # Packet too short, it must be invalid
             if len(field_data) == 0:
-                raise InvalidPkg('package too short')
+                raise InvalidPkt('packet too short')
 
             try:
                 value = self._unpack(field_data, type_)
             except struct.error:
-                raise InvalidPkg('unpack failed')
+                raise InvalidPkt('unpack failed')
 
             if field_name == 'type':
-                if value not in (PkgTypes.DATA, PkgTypes.CTRL):
-                    raise InvalidPkg('Invalid type field')
+                if value not in (PktTypes.DATA, PktTypes.CTRL):
+                    raise InvalidPkt('Invalid type field')
 
-                if value == PkgTypes.DATA and pkg_fmt.__type__ != PkgTypes.DATA:
-                    raise SwitchPkgFmt('another one needed')
-                if value == PkgTypes.CTRL and pkg_fmt.__type__ != PkgTypes.CTRL:
-                    raise SwitchPkgFmt('another one needed')
+                if value == PktTypes.DATA and pkt_fmt.__type__ != PktTypes.DATA:
+                    raise SwitchPktFmt('another one needed')
+                if value == PktTypes.CTRL and pkt_fmt.__type__ != PktTypes.CTRL:
+                    raise SwitchPktFmt('another one needed')
 
             fields.__update__(**{field_name: value})
             cur += length

@@ -4,7 +4,7 @@
 from neverland.utils import ObjectifiedDict
 
 
-class PkgTypes:
+class PktTypes:
 
     DATA = 0x01
     CTRL = 0x02
@@ -23,10 +23,9 @@ class FieldTypes:
     PY_BYTES = 0x41
 
 
-class UDPPackage(ObjectifiedDict):
+class UDPPacket(ObjectifiedDict):
 
-    ''' The UDP Package
-    (Or packet? But I'm prefer package than packet. Well, that's not matter)
+    ''' The UDP Packet
 
     Inner Data Structure:
         {
@@ -49,7 +48,7 @@ class UDPPackage(ObjectifiedDict):
         }
 
     By default, the "valid" field is None. It should be set
-    during the unpacking if the package is from other node.
+    during the unpacking if the packet is from other node.
 
     The "data" field is bytes which is going to transmit or just received.
 

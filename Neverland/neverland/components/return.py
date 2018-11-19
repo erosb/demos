@@ -8,7 +8,7 @@ class BaseDataReturner():
 
     ''' The base class of the data returners
 
-    This kind of classes are responsible for returning packages from the
+    This kind of classes are responsible for returning packets from the
     destination server.
 
     Data returners are only used in the following cases:
@@ -29,12 +29,12 @@ class BaseDataReturner():
         rt_sock.bind(sa_2_bind)
         return rt_sock
 
-    def return_pkg(self, pkg):
+    def return_pkt(self, pkt):
         rt_sock = self._create_return_socket(
                       ('0.0.0.0', 0)
                   )
         rt_sock.sendto(
-            pkg.data, (pkg.dest.addr, pkg.dest.port)
+            pkt.data, (pkt.dest.addr, pkt.dest.port)
         )
         # It's very fast to create a new socket, so we don't need to cache it
         rt_sock.close()
@@ -56,12 +56,12 @@ class ClientDataReturner(BaseDataReturner):
         rt_sock.bind(dest)
         return rt_sock
 
-    def return_pkg(self, pkg):
+    def return_pkt(self, pkt):
         rt_sock = self._create_return_socket(
-                      (pkg.src.addr, pkg.src.port)
+                      (pkt.src.addr, pkt.src.port)
                   )
         rt_sock.sendto(
-            pkg.data, (pkg.dest.addr, pkg.dest.port)
+            pkt.data, (pkt.dest.addr, pkt.dest.port)
         )
         rt_sock.close()
 
