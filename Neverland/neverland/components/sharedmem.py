@@ -24,7 +24,6 @@ __all__ = [
 ]
 
 
-
 ''' The shared memory module
 
 For keeping consistency of some resources, I decided to make a

@@ -65,7 +65,32 @@ class CtrlPktFormat():
     ''' The format of the controlling packets
     '''
 
-    __type__ = PktTypes.CTRL
+    __type__ = PktTypes.Ctrl
+
+    @classmethod
+    def gen_fmt(cls, config):
+        cls.__fmt__ = {
+            # The first 7 fields are same as the above.
+            'salt': (config.salt_len or 8, FieldTypes.PY_BYTES),
+            'mac': (64, FieldTypes.PY_BYTES),
+            'serial': (8, FieldTypes.STRUCT_U_LONG_LONG),
+            'time': (8, FieldTypes.STRUCT_U_LONG_LONG),
+            'type': (1, FieldTypes.STRUCT_U_CHAR),
+            'diverged': (1, FieldTypes.STRUCT_U_CHAR),
+            'src': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
+            'dest': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
+
+            'subject': (4, FieldTypes.STRUCT_U_INT),
+            'content': (UDP_DATA_LEN, FieldTypes.PY_BYTES),
+        }
+
+
+class ConnCtrlPktFormat():
+
+    ''' The format of the connection controlling packets
+    '''
+
+    __type__ = PktTypes.CONN_CTRL
 
     @classmethod
     def gen_fmt(cls, config):

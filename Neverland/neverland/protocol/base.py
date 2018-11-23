@@ -23,7 +23,7 @@ class BasePktFormat():
 
     The format of the __fmt__ dict:
         {
-            'field_name': (length, type),  #type is listed in neverland.pkt.FieldTypes
+            'field_name': (length, type), #type is listed in neverland.pkt.FieldTypes
         }
 
     This kind of classes depends on the ordered dict feature which implemented

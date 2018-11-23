@@ -10,8 +10,8 @@ class BaseLogicHandler():
     packets should go and how many lanes should they use.
     '''
 
-    def __init__(self):
-        pass
+    def __init__(self, config):
+        self.config = config
 
     def handle_logic(self, pkt):
         pass

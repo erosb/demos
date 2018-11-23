@@ -6,8 +6,14 @@ from neverland.utils import ObjectifiedDict
 
 class PktTypes:
 
+    # Normal data packets, used in transfering data from applications
     DATA = 0x01
+
+    # Controlling packets, used in communicating with the controller node
     CTRL = 0x02
+
+    # Connection controlling packets, used in managing connections from other nodes
+    CONN_CTRL = 0x03
 
 
 class FieldTypes:

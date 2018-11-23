@@ -8,14 +8,15 @@ import signal as sig
 import logging
 
 from neverland.node import ROLES
+from neverland.node.context import NodeContext
 from neverland.core.common import CommonCore
 from neverland.afferents.udp import UDPReceiver, ClientUDPReceiver
 from neverland.efferents.udp import UDPTransmitter
 from neverland.protocol.v0 import ProtocolWrapper, DataPktFormat, CtrlPktFormat
-from neverland.logic.client import ClientLogicHandler
-from neverland.logic.controller import ControllerLogicHandler
-from neverland.logic.outlet import OutletLogicHandler
-from neverland.logic.relay import RelayLogicHandler
+from neverland.logic.client.v0 import ClientLogicHandler
+from neverland.logic.controller.v0 import ControllerLogicHandler
+from neverland.logic.outlet.v0 import OutletLogicHandler
+from neverland.logic.relay.v0 import RelayLogicHandler
 from neverland.components.sharedmem import SharedMemoryManager
 
 
@@ -23,7 +24,7 @@ logger = logging.getLogger('main')
 
 
 AFFERENT_MAPPING = {
-    ROLES.client: ClientLogicHandler,
+    ROLES.client: ClientUDPReceiver,
     ROLES.controller: UDPReceiver,
     ROLES.outlet: UDPReceiver,
     ROLES.relay: UDPReceiver,
@@ -140,6 +141,12 @@ class BaseNode():
             os.kill(ppid, sig.SIGTERM)
             os.setsid()
 
+    def _create_context(self):
+        NodeContext.shm_mgr = self.shm_mgr
+
+    def get_context():
+        return NodeContext
+
     def load_modules(self):
         self.shm_mgr = SharedMemoryManager(self.config)
 
@@ -151,7 +158,7 @@ class BaseNode():
         self.protocol_wrapper = ProtocolWrapper(
                                     config,
                                     DataPktFormat,
-                                    CtrlPktFormat
+                                    CtrlPktFormat,
                                 )
 
         self.logic_handler_cls = LOGIC_HANDLER_MAPPING[self.role]
@@ -167,6 +174,7 @@ class BaseNode():
     def run(self):
         self.daemonize()
         self.load_modules()
+        self._create_context()
 
         # start SharedMemoryManager worker
         pid = os.fork()
