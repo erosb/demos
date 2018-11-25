@@ -3,7 +3,6 @@
 
 from neverland.pkt import FieldTypes, PktTypes
 from neverland.utils import ObjectifiedDict
-from neverland.protocol.base import BaseProtocolWrapper
 
 
 UDP_DATA_LEN = 65535
@@ -117,7 +116,3 @@ class ConnCtrlPktFormat():
             # The iv
             'iv': (config.iv_len or 8, FieldTypes.PY_BYTES),
         }
-
-
-class ProtocolWrapper(BaseProtocolWrapper):
-    pass

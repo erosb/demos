@@ -7,7 +7,7 @@ import __code_path__
 from neverland.pkt import UDPPacket, PktTypes
 from neverland.utils import ObjectifiedDict
 from neverland.protocol.v0 import ProtocolWrapper
-from neverland.protocol.v0 import (
+from neverland.protocol.v0.fmt import (
     HeaderFormat,
     DataPktFormat,
     CtrlPktFormat,

@@ -12,8 +12,8 @@ from neverland.node.context import NodeContext
 from neverland.core.common import CommonCore
 from neverland.afferents.udp import UDPReceiver, ClientUDPReceiver
 from neverland.efferents.udp import UDPTransmitter
-from neverland.protocol.v0 import (
-    ProtocolWrapper,
+from neverland.protocol.v0 import ProtocolWrapper
+from neverland.protocol.v0.fmt import (
     HeaderFormat,
     DataPktFormat,
     CtrlPktFormat,
