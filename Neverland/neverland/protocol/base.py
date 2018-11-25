@@ -9,7 +9,6 @@ from neverland.exceptions import (
     PktWrappingError,
     PktUnwrappingError,
     InvalidPkt,
-    SwitchPktFmt,
 )
 
 

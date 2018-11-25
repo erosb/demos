@@ -4,7 +4,6 @@
 from neverland.pkt import FieldTypes, PktTypes
 from neverland.utils import ObjectifiedDict
 from neverland.protocol.base import BaseProtocolWrapper
-from neverland.exceptions import SwitchPktFmt, InvalidPkt
 
 
 UDP_DATA_LEN = 65535
