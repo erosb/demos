@@ -7,15 +7,26 @@ from neverland.protocol.base import BaseProtocolWrapper
 from neverland.exceptions import SwitchPktFmt, InvalidPkt
 
 
-UDP_DATA_LEN = 32768
+UDP_DATA_LEN = 65535
 
 
-class DataPktFormat():
+'''
+In order to normalize the packets, we simply split them into 2 pieces.
 
-    ''' The format of data packets
+The first one is the header, it will be fixed on the head of a packet,
+it shall contain some common informations that all packets shall contain.
+
+The second one is the body, just like body field in HTTP,
+it shall contain the data we need to transfer.
+'''
+
+
+class HeaderFormat():
+
+    ''' The format of packet headers
     '''
 
-    __type__ = PktTypes.DATA
+    __type__ = None
 
     @classmethod
     def gen_fmt(cls, config):
@@ -54,7 +65,19 @@ class DataPktFormat():
             # The destination of the packet
             # TODO ipv6 support
             'dest': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
+        }
 
+
+class DataPktFormat():
+
+    ''' The format of data packets' body
+    '''
+
+    __type__ = PktTypes.DATA
+
+    @classmethod
+    def gen_fmt(cls, config):
+        cls.__fmt__ = {
             # The data
             'data': (UDP_DATA_LEN, FieldTypes.PY_BYTES),
         }
@@ -62,7 +85,7 @@ class DataPktFormat():
 
 class CtrlPktFormat():
 
-    ''' The format of the controlling packets
+    ''' The format of the controlling packets'b body
     '''
 
     __type__ = PktTypes.Ctrl
@@ -70,16 +93,6 @@ class CtrlPktFormat():
     @classmethod
     def gen_fmt(cls, config):
         cls.__fmt__ = {
-            # The first 7 fields are same as the above.
-            'salt': (config.salt_len or 8, FieldTypes.PY_BYTES),
-            'mac': (64, FieldTypes.PY_BYTES),
-            'serial': (8, FieldTypes.STRUCT_U_LONG_LONG),
-            'time': (8, FieldTypes.STRUCT_U_LONG_LONG),
-            'type': (1, FieldTypes.STRUCT_U_CHAR),
-            'diverged': (1, FieldTypes.STRUCT_U_CHAR),
-            'src': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
-            'dest': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
-
             'subject': (4, FieldTypes.STRUCT_U_INT),
             'content': (UDP_DATA_LEN, FieldTypes.PY_BYTES),
         }
@@ -87,7 +100,7 @@ class CtrlPktFormat():
 
 class ConnCtrlPktFormat():
 
-    ''' The format of the connection controlling packets
+    ''' The format of the connection controlling packets' body
     '''
 
     __type__ = PktTypes.CONN_CTRL
@@ -95,16 +108,6 @@ class ConnCtrlPktFormat():
     @classmethod
     def gen_fmt(cls, config):
         cls.__fmt__ = {
-            # The first 7 fields are same as the above.
-            'salt': (config.salt_len or 8, FieldTypes.PY_BYTES),
-            'mac': (64, FieldTypes.PY_BYTES),
-            'serial': (8, FieldTypes.STRUCT_U_LONG_LONG),
-            'time': (8, FieldTypes.STRUCT_U_LONG_LONG),
-            'type': (1, FieldTypes.STRUCT_U_CHAR),
-            'diverged': (1, FieldTypes.STRUCT_U_CHAR),
-            'src': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
-            'dest': (None if config.ipv6 else 6, FieldTypes.STRUCT_IPV4_SA),
-
             # The flag of whether the iv should be changed
             # 0x01 for Ture and 0x02 for False
             'iv_changed': (1, FieldTypes.STRUCT_U_CHAR),
@@ -118,47 +121,4 @@ class ConnCtrlPktFormat():
 
 
 class ProtocolWrapper(BaseProtocolWrapper):
-
-    def parse_udp_pkt(self, data, pkt_fmt):
-        ''' override the parse_udp_pkt method
-
-        We need to determine the type of packets.
-        In this version of protocol, the first 7 fields in data packets and
-        control packets are same, so we can simply look for the "type" field.
-
-        Raise SwitchPktFmt when we need another type of pkt_fmt.
-
-        Well, actually, the pkt_fmt argument will always be the data_pkt_fmt.
-        Once we raise the SwitchPktFmt, the upper layer will use ctrl_pkt_fmt
-        instead. Currently, we have only 2 class of pkt_fmt
-        '''
-
-        cur = 0
-        fields = ObjectifiedDict()
-
-        for field_name, definition in pkt_fmt.__fmt__.items():
-            length, type_ = definition
-
-            field_data = data[cur: cur + length]
-            # Packet too short, it must be invalid
-            if len(field_data) == 0:
-                raise InvalidPkt('packet too short')
-
-            try:
-                value = self._unpack(field_data, type_)
-            except struct.error:
-                raise InvalidPkt('unpack failed')
-
-            if field_name == 'type':
-                if value not in (PktTypes.DATA, PktTypes.CTRL):
-                    raise InvalidPkt('Invalid type field')
-
-                if value == PktTypes.DATA and pkt_fmt.__type__ != PktTypes.DATA:
-                    raise SwitchPktFmt('another one needed')
-                if value == PktTypes.CTRL and pkt_fmt.__type__ != PktTypes.CTRL:
-                    raise SwitchPktFmt('another one needed')
-
-            fields.__update__(**{field_name: value})
-            cur += length
-
-        return fields
+    pass

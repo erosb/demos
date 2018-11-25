@@ -10,19 +10,6 @@ class PktUnwrappingError(Exception):
     pass
 
 
-class SwitchPktFmt(Exception):
-
-    ''' Switch the packet format definition
-
-    Used in ProtocolWrapper.
-
-    This exception means that we need to use another packet format.
-
-    Once catched this exception, the upper layer should invoke the method
-    again with another packet format definition.
-    '''
-
-
 class InvalidPkt(Exception):
     pass
 

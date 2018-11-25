@@ -1,10 +1,10 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-from neverland.utils import ObjectifiedDict
+from neverland.utils import ObjectifiedDict, MetaEnum
 
 
-class PktTypes:
+class PktTypes(metaclass=MetaEnum):
 
     # Normal data packets, used in transfering data from applications
     DATA = 0x01
@@ -16,7 +16,7 @@ class PktTypes:
     CONN_CTRL = 0x03
 
 
-class FieldTypes:
+class FieldTypes(metaclass=MetaEnum):
 
     STRUCT_U_CHAR = 0x11
     STRUCT_U_INT = 0x12

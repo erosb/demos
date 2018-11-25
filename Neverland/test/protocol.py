@@ -4,17 +4,28 @@
 import unittest
 
 import __code_path__
-from neverland.pkt import UDPPacket
+from neverland.pkt import UDPPacket, PktTypes
 from neverland.utils import ObjectifiedDict
 from neverland.protocol.v0 import ProtocolWrapper
-from neverland.protocol.v0 import DataPktFormat, CtrlPktFormat
+from neverland.protocol.v0 import (
+    HeaderFormat,
+    DataPktFormat,
+    CtrlPktFormat,
+    ConnCtrlPktFormat,
+)
 
 
 config = ObjectifiedDict()
 config.salt_len = 8
 config.ipv6 = False
 
-base_wrapper = ProtocolWrapper(config, DataPktFormat, CtrlPktFormat)
+base_wrapper = ProtocolWrapper(
+                   config,
+                   HeaderFormat,
+                   DataPktFormat,
+                   CtrlPktFormat,
+                   ConnCtrlPktFormat,
+               )
 
 
 class PWTest(unittest.TestCase):
@@ -26,7 +37,7 @@ class PWTest(unittest.TestCase):
                          mac=b'a'*64,
                          serial=1,
                          time=1,
-                         type=0x02,
+                         type=PktTypes.CONN_CTRL,
                          diverged=0x01,
                          src=('127.0.0.1', 65535),
                          dest=('127.0.0.1', 65535),
@@ -46,7 +57,7 @@ class PWTest(unittest.TestCase):
         pkt1 = base_wrapper.unwrap(pkt1)
 
         self.assertEqual(pkt1.valid, True)
-        self.assertEqual(pkt1.type, 0x02)
+        self.assertEqual(pkt1.type, PktTypes.CONN_CTRL)
         self.assertEqual(pkt1.fields.src, pkt.fields.src)
         self.assertEqual(pkt1.fields.dest, pkt.fields.dest)
 
