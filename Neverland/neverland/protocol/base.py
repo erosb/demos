@@ -12,6 +12,10 @@ from neverland.exceptions import (
 )
 
 
+class FieldDefinition(ObjectifiedDict):
+    pass
+
+
 class BasePktFormat():
 
     ''' The format of Neverland UDP packets
@@ -20,14 +24,20 @@ class BasePktFormat():
     It should contain a dict type attribute named as "__fmt__" which describes
     the format of packets
 
-    The format of the __fmt__ dict:
-        {
-            'field_name': (length, type), #type is listed in neverland.pkt.FieldTypes
-        }
+    The format of the __fmt__: {
+
+        'field_name': ObjectifiedDict(
+                          length   = <length of the field>,
+                          type     = <field type, enumerated in FieldTypes>,
+                          default  = <default value of the field>,
+                          calc_cls = <specify a calculating class>,
+                      )
+
+    }
 
     This kind of classes depends on the ordered dict feature which implemented
     in Python 3.6 and becomes a ture feature in Python 3.7. So this also means
-    older Versions (< 3.6) of Python interpreters will not be supported.
+    earlier versions (< 3.6) of Python interpreters will not be supported.
 
     And we also need define the __type__ attribute, it describes the type of
     the packet format definition. The value should be choosed from pkt.PktTypes
@@ -103,15 +113,13 @@ class BaseProtocolWrapper():
 
         # make header first
         for field_name, definition in self.header_fmt.__fmt__.items():
-            length, type_ = definition
             value = getattr(data, field_name)
-            bytes_ += self._pack_field(value, type_)
+            bytes_ += self._pack_field(value, definition.type)
 
         # then, make body
         for field_name, definition in pkt_fmt.__fmt__.items():
-            length, type_ = definition
             value = getattr(data, field_name)
-            bytes_ += self._pack_field(value, type_)
+            bytes_ += self._pack_field(value, definition.type)
 
         return bytes_
 
@@ -179,20 +187,19 @@ class BaseProtocolWrapper():
 
         # parse the header first
         for field_name, definition in self.header_fmt.__fmt__.items():
-            length, type_ = definition
+            field_data = data[cur: cur + definition.length]
 
-            field_data = data[cur: cur + length]
             # Packet too short, it must be invalid
             if len(field_data) == 0:
                 raise InvalidPkt('packet too short')
 
             try:
-                value = self._unpack_field(field_data, type_)
+                value = self._unpack_field(field_data, definition.type)
             except struct.error:
                 raise InvalidPkt('unpack failed')
 
             fields.__update__(**{field_name: value})
-            cur += length
+            cur += definition.length
 
         body_type = fields.type
         body_fmt = self._fmt_mapping.get(body_type)
@@ -201,20 +208,19 @@ class BaseProtocolWrapper():
 
         # parse the body
         for field_name, definition in body_fmt.__fmt__.items():
-            length, type_ = definition
-
-            field_data = data[cur: cur + length]
+            field_data = data[cur: cur + definition.length]
             # Packet too short, it must be invalid
+
             if len(field_data) == 0:
                 raise InvalidPkt('packet too short')
 
             try:
-                value = self._unpack_field(field_data, type_)
+                value = self._unpack_field(field_data, definition.type)
             except struct.error:
                 raise InvalidPkt('unpack failed')
 
             fields.__update__(**{field_name: value})
-            cur += length
+            cur += definition.length
 
         return fields
 

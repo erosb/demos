@@ -9,7 +9,7 @@ class PktTypes(metaclass=MetaEnum):
     # Normal data packets, used in transfering data from applications
     DATA = 0x01
 
-    # Controlling packets, used in communicating with the controller node
+    # Cluster controlling packets, used in communicating with the controller node
     CTRL = 0x02
 
     # Connection controlling packets, used in managing connections from other nodes
