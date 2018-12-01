@@ -133,14 +133,14 @@ def mac_calculator(pkt, header_fmt, body_fmt):
             SHA256( <salt> + <other_fields> )
     '''
 
-    salt = pkt.fields.salt
-    data_2_hash = salt
+    data_2_hash = pkt.byte_fields.salt
 
     for field_name, definition in header_fmt.__fmt__.items():
         if field_name in ('salt', 'mac'):
             continue
 
-        data_2_hash += getattr(pkt.byte_fields, field_name)
+        byte_value = getattr(pkt.byte_fields, field_name)
+        data_2_hash += byte_value
 
     return HashTools.sha256(data_2_hash)
 

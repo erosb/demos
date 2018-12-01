@@ -46,10 +46,7 @@ class PWTest(unittest.TestCase):
     def test_1_wrap_unwrap(self):
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
-                         salt=b'a'*8,
-                         mac=b'a'*64,
                          serial=1,
-                         time=1,
                          type=PktTypes.CONN_CTRL,
                          diverged=0x01,
                          src=('127.0.0.1', 65535),
