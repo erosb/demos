@@ -9,9 +9,16 @@ import logging
 
 from neverland.node import ROLES
 from neverland.node.context import NodeContext
-from neverland.core.common import CommonCore
+from neverland.core.client import ClientCore
+from neverland.core.relay import RelayCore
+from neverland.core.outlet import OutletCore
+from neverland.core.controller import ControllerCore
 from neverland.afferents.udp import UDPReceiver, ClientUDPReceiver
 from neverland.efferents.udp import UDPTransmitter
+from neverland.logic.client.v0 import ClientLogicHandler
+from neverland.logic.controller.v0 import ControllerLogicHandler
+from neverland.logic.outlet.v0 import OutletLogicHandler
+from neverland.logic.relay.v0 import RelayLogicHandler
 from neverland.protocol.v0 import ProtocolWrapper
 from neverland.protocol.v0.fmt import (
     HeaderFormat,
@@ -19,10 +26,6 @@ from neverland.protocol.v0.fmt import (
     CtrlPktFormat,
     ConnCtrlPktFormat,
 )
-from neverland.logic.client.v0 import ClientLogicHandler
-from neverland.logic.controller.v0 import ControllerLogicHandler
-from neverland.logic.outlet.v0 import OutletLogicHandler
-from neverland.logic.relay.v0 import RelayLogicHandler
 from neverland.components.sharedmem import SharedMemoryManager
 
 
@@ -31,15 +34,23 @@ logger = logging.getLogger('main')
 
 AFFERENT_MAPPING = {
     ROLES.client: ClientUDPReceiver,
-    ROLES.controller: UDPReceiver,
-    ROLES.outlet: UDPReceiver,
     ROLES.relay: UDPReceiver,
+    ROLES.outlet: UDPReceiver,
+    ROLES.controller: UDPReceiver,
 }
+
 LOGIC_HANDLER_MAPPING = {
     ROLES.client: ClientLogicHandler,
-    ROLES.controller: ControllerLogicHandler,
-    ROLES.outlet: OutletLogicHandler,
     ROLES.relay: RelayLogicHandler,
+    ROLES.outlet: OutletLogicHandler,
+    ROLES.controller: ControllerLogicHandler,
+}
+
+CORE_MAPPING = {
+    ROLES.client: ClientCore,
+    ROLES.relay: RelayCore,
+    ROLES.outlet: OutletCore,
+    ROLES.controller: ControllerCore,
 }
 
 
@@ -172,7 +183,9 @@ class BaseNode():
         self.logic_handler_cls = LOGIC_HANDLER_MAPPING[self.role]
         self.logic_handler = self.logic_handler_cls(self.config)
 
-        self.core = CommonCore(
+        self.core_cls = CORE_MAPPING.get(self.role)
+        self.core = core_cls(
+                        self.config,
                         afferents=[self.main_afferent],
                         efferent=self.efferent,
                         logic_handler=self.logic_handler,

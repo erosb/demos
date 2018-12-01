@@ -1,10 +1,12 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
+import os
+import time
 import struct
 
 from neverland.pkt import UDPPacket, PktTypes, FieldTypes
-from neverland.utils import ObjectifiedDict
+from neverland.utils import ObjectifiedDict, HashTools
 from neverland.exceptions import (
     PktWrappingError,
     PktUnwrappingError,
@@ -27,13 +29,29 @@ class BasePktFormat():
     The format of the __fmt__: {
 
         'field_name': ObjectifiedDict(
-                          length   = <length of the field>,
-                          type     = <field type, enumerated in FieldTypes>,
-                          default  = <default value of the field>,
-                          calc_cls = <specify a calculating class>,
+                          length        = <length of the field>,
+                          type          = <field type, enumerated in FieldTypes>,
+                          default       = <default value of the field>,
+                          calculator    = <specify a function to calculate the field>,
+                          calc_priority = <an integer, smaller number means higher priority>
                       )
 
     }
+
+    Example of the "calculator":
+
+        def field_calculator(pkt, header_fmt, body_fmt):
+            """
+            :param pkt: neverland.pkt.UDPPacket instance
+            :param header_fmt: the format class of the header of current packet
+            :param body_fmt: the format class of the body of current packet
+            """
+
+            ## some calculation...
+
+            return value
+
+    -------------------------------------------
 
     This kind of classes depends on the ordered dict feature which implemented
     in Python 3.6 and becomes a ture feature in Python 3.7. So this also means
@@ -43,8 +61,12 @@ class BasePktFormat():
     the packet format definition. The value should be choosed from pkt.PktTypes
     '''
 
-    __fmt__ = None
     __type__ = None
+    __fmt__ = dict()
+
+    # field definitions that contains a calculator,
+    # sorted by the calculator priority
+    __calc_definition__ = dict()
 
     @classmethod
     def gen_fmt(cls, config):
@@ -53,14 +75,92 @@ class BasePktFormat():
         An optional way to generate the packet format definition
         '''
 
+    @classmethod
+    def sort_calculators(cls):
+        '''
+        Sort field calculators by the defined priority and
+        store them in cls.__calc_definition__
+        '''
+
+        def _key(item):
+            definition = item[1]
+            return definition.calc_priority or 0
+
+        sorted_fmt = sorted(cls.__fmt__.items(), key=_key)
+
+        for field_name, definition in sorted_fmt:
+            if definition.calculator is not None:
+                cls.__calc_definition__.update({field_name: definition})
+
+
+class ComplexedFormat(BasePktFormat):
+
+    ''' Complexed packet format
+
+    Sometimes, we will need to combine the header format and the body format.
+    '''
+
+    def combine_fmt(self, fmt_cls):
+        ''' combine a new packet format class
+
+        Just like dict.update.
+        Uuuhh, well, it has nothing different with dict.update.
+        '''
+
+        self.__fmt__.update(fmt_cls.__fmt__)
+
+
+def salt_calculator(pkt, header_fmt, body_fmt):
+    ''' calculator for the salt field
+    '''
+
+    salt_definition = header_fmt.__fmt__.get('salt')
+    salt_len = salt_definition.length
+    return os.urandom(salt_len)
+
+
+def mac_calculator(pkt, header_fmt, body_fmt):
+    ''' calculator for calculating the mac field
+
+    Rule of the mac calculating:
+        Generally, salt field and mac field are always at the first and the second
+        field in the packet header. So, by default our packets will look like:
+
+            <salt> <mac> <other_fields>
+
+        Here I define the default rule of mac calculating as this:
+
+            SHA256( <salt> + <other_fields> )
+    '''
+
+    salt = pkt.fields.salt
+    data_2_hash = salt
+
+    for field_name, definition in header_fmt.__fmt__.items():
+        if field_name in ('salt', 'mac'):
+            continue
+
+        data_2_hash += getattr(pkt.byte_fields, field_name)
+
+    return HashTools.sha256(data_2_hash)
+
+
+def time_calculator(*_):
+    ''' calculator for the time field
+    '''
+
+    return int(
+        time.time() * 1000000
+    )
+
 
 class BaseProtocolWrapper():
 
     ''' The ProtocolWrapper class
 
-    This kind of classes are responsible for converting the neverland.pkt.UDPPacket
-    object into real UDP packets (bytes) which could be a valid UDP packet
-    that can be forwarded by Neverland nodes.
+    This kind of classes are responsible for converting the
+    neverland.pkt.UDPPacket object into real UDP packets (bytes) which
+    could be a valid UDP packet that can be forwarded by Neverland nodes.
     '''
 
     def __init__(
@@ -82,12 +182,15 @@ class BaseProtocolWrapper():
         self.ctrl_pkt_fmt.gen_fmt(config)
         self.conn_ctrl_pkt_fmt.gen_fmt(config)
 
-        self._fmt_mapping = {
+        self._body_fmt_mapping = {
             'header': self.header_fmt,
             PktTypes.DATA: self.data_pkt_fmt,
             PktTypes.CTRL: self.ctrl_pkt_fmt,
             PktTypes.CONN_CTRL: self.conn_ctrl_pkt_fmt,
         }
+
+        # used by self.make_udp_pkt
+        self.complexed_fmt_cache = dict()
 
     def wrap(self, pkt):
         ''' make a valid Neverland UDP packet
@@ -96,38 +199,78 @@ class BaseProtocolWrapper():
         :return: neverland.pkt.UDPPacket object
         '''
 
-        pkt_fmt = self._fmt_mapping.get(pkt.type)
-        udp_data = self.make_udp_pkt(pkt.fields, pkt_fmt)
+        pkt_fmt = self._body_fmt_mapping.get(pkt.type)
+        udp_data = self.make_udp_pkt(pkt, pkt_fmt)
         pkt.data = udp_data
         return pkt
 
-    def make_udp_pkt(self, data, pkt_fmt):
+    def make_udp_pkt(self, pkt, body_fmt):
         ''' make a valid Neverland UDP packet
 
-        :param data: the "fields" attribute of neverland.pkt.UDPPacket object
-        :param pkt_fmt: the format definition class
-        :return: bytes
+        During the packing, this method will put each fields into pkt.byte_fields
+
+        :param pkt: neverland.pkt.UDPPacket object
+        :param body_fmt: the format definition class of the packet body
+        :return: udp_data
         '''
 
-        bytes_ = b''
+        udp_data = b''
+        fmt_name = body_fmt.__class__.__name__
 
-        # make header first
-        for field_name, definition in self.header_fmt.__fmt__.items():
-            value = getattr(data, field_name)
-            bytes_ += self._pack_field(value, definition.type)
+        # Here, we need combine the header format and the body format,
+        # so that the calculator priority can work in both 2 format classes
+        if fmt_name in self.complexed_fmt_cache:
+            fmt = self.complexed_fmt_cache.get(fmt_name)
+        else:
+            fmt = ComplexedFormat()
+            fmt.combine_fmt(self.header_fmt)
+            fmt.combine_fmt(body_fmt)
+            fmt.sort_calculators()
 
-        # then, make body
-        for field_name, definition in pkt_fmt.__fmt__.items():
-            value = getattr(data, field_name)
-            bytes_ += self._pack_field(value, definition.type)
+            self.complexed_fmt_cache.update({fmt_name: fmt})
 
-        return bytes_
+        for field_name, definition in fmt.__fmt__.items():
+            value = getattr(pkt.fields, field_name)
+
+            if value is None:
+                if definition.calculator is None:
+                    if definition.default is not None:
+                        value = definition.default
+                    else:
+                        raise PktWrappingError(
+                            f'Field {field_name} has no value '
+                            f'nor calculator or a default value'
+                        )
+                else:
+                    # we will calculate it later by the specified calculator
+                    continue
+
+            fragment = self._pack_field(value, definition.type)
+            pkt.byte_fields.__update__(**{field_name: fragment})
+
+        for field_name, definition in fmt.__calc_definition__.items():
+            value = definition.calculator(pkt, self.header_fmt, body_fmt)
+            if value is None:
+                raise PktWrappingError(
+                    f'Field {field_name}; calculator {calculator} doesn\'t '
+                    f'return a valid value'
+                )
+
+            fragment = self._pack_field(value, definition.type)
+            pkt.byte_fields.__update__(**{field_name: fragment})
+
+        # Finally, all fields are ready. Now we can combine them into udp_data
+        for field_name, definition in fmt.__fmt__.items():
+            bytes_ = getattr(pkt.byte_fields, field_name)
+            udp_data += bytes_
+
+        return udp_data
 
     def _pack_field(self, value, field_type):
         ''' pack a single field
 
         :param value: value of the field
-        :param field_type: type of the field, choosed from neverland.pkt.FieldTypes
+        :param field_type: type of the field, select from neverland.pkt.FieldTypes
         :return: bytes
         '''
 
@@ -165,29 +308,32 @@ class BaseProtocolWrapper():
         '''
 
         try:
-            fields = self.parse_udp_pkt(pkt.data)
+            fields, byte_fields = self.parse_udp_pkt(pkt)
             pkt.fields = fields
+            pkt.byte_fields = byte_fields
             pkt.type = fields.type
             pkt.valid = True
         except InvalidPkt:
             pkt.fields = None
+            pkt.byte_fields = None
             pkt.valid = False
 
         return pkt
 
-    def parse_udp_pkt(self, data):
+    def parse_udp_pkt(self, pkt):
         ''' parse a raw UDP packet
 
-        :param data: bytes
-        :return: neverland.utils.ObjectifiedDict object
+        :param value: value of the field
+        :return: (fields, byte_fields)
         '''
 
         cur = 0   # cursor
         fields = ObjectifiedDict()
+        byte_fields = ObjectifiedDict()
 
         # parse the header first
         for field_name, definition in self.header_fmt.__fmt__.items():
-            field_data = data[cur: cur + definition.length]
+            field_data = pkt.data[cur: cur + definition.length]
 
             # Packet too short, it must be invalid
             if len(field_data) == 0:
@@ -199,16 +345,17 @@ class BaseProtocolWrapper():
                 raise InvalidPkt('unpack failed')
 
             fields.__update__(**{field_name: value})
+            byte_fields.__update__(**{field_name: field_data})
             cur += definition.length
 
         body_type = fields.type
-        body_fmt = self._fmt_mapping.get(body_type)
+        body_fmt = self._body_fmt_mapping.get(body_type)
         if body_fmt is None:
             raise InvalidPkt('invalid type')
 
         # parse the body
         for field_name, definition in body_fmt.__fmt__.items():
-            field_data = data[cur: cur + definition.length]
+            field_data = pkt.data[cur: cur + definition.length]
             # Packet too short, it must be invalid
 
             if len(field_data) == 0:
@@ -220,9 +367,10 @@ class BaseProtocolWrapper():
                 raise InvalidPkt('unpack failed')
 
             fields.__update__(**{field_name: value})
+            byte_fields.__update__(**{field_name: field_data})
             cur += definition.length
 
-        return fields
+        return fields, byte_fields
 
     def _unpack_field(self, data, field_type):
         ''' unpack a single field

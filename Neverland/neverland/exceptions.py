@@ -2,6 +2,10 @@
 #coding: utf-8
 
 
+class ConfigError(Exception):
+    pass
+
+
 class PktWrappingError(Exception):
     pass
 
@@ -16,6 +20,12 @@ class InvalidPkt(Exception):
 
 class AddressAlreadyInUse(Exception):
     pass
+
+
+class DropPakcet(Exception):
+
+    ''' Current packet shall be dropped
+    '''
 
 
 class SharedMemoryError(Exception):

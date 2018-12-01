@@ -2,7 +2,13 @@
 #coding: utf-8
 
 from neverland.pkt import FieldTypes, PktTypes
-from neverland.protocol.base import FieldDefinition
+from neverland.protocol.base import (
+    FieldDefinition,
+    BasePktFormat,
+    salt_calculator,
+    mac_calculator,
+    time_calculator,
+)
 
 
 UDP_DATA_LEN = 65535
@@ -19,7 +25,7 @@ it shall contain the data we need to transfer.
 '''
 
 
-class HeaderFormat():
+class HeaderFormat(BasePktFormat):
 
     ''' The format of packet headers
     '''
@@ -32,16 +38,20 @@ class HeaderFormat():
             # Allows users to config it in the config file.
             # This should be unified in the community.
             'salt': FieldDefinition(
-                        length = config.salt_len or 8,
-                        type   = FieldTypes.PY_BYTES,
+                        length        = config.salt_len or 8,
+                        type          = FieldTypes.PY_BYTES,
+                        calculator    = salt_calculator,
+                        calc_priority = 0x00,
                     ),
 
             # The Message Authentication Code.
             # In protocol v0, we use sha256 as the digest method,
             # so the length is fixed to 64
             'mac': FieldDefinition(
-                       length = 64,
-                       type   = FieldTypes.PY_BYTES,
+                       length        = 64,
+                       type          = FieldTypes.PY_BYTES,
+                       calculator    = mac_calculator,
+                       calc_priority = 0xff,
                    ),
 
             # Each UDP packet should have a serial number as its identifier.
@@ -57,8 +67,10 @@ class HeaderFormat():
 
             # The timestamp of the creation of the packet
             'time': FieldDefinition(
-                        length = 8,
-                        type   = FieldTypes.STRUCT_U_LONG_LONG,
+                        length        = 8,
+                        type          = FieldTypes.STRUCT_U_LONG_LONG,
+                        calculator    = time_calculator,
+                        calc_priority = 0x00,
                     ),
 
             # Packet type, 0x01 for data packets and 0x02 for controlling pkts
@@ -90,7 +102,7 @@ class HeaderFormat():
         }
 
 
-class DataPktFormat():
+class DataPktFormat(BasePktFormat):
 
     ''' The format of data packets' body
     '''
@@ -108,7 +120,7 @@ class DataPktFormat():
         }
 
 
-class CtrlPktFormat():
+class CtrlPktFormat(BasePktFormat):
 
     ''' The format of cluster controlling packets' body
     '''
@@ -135,7 +147,7 @@ class CtrlPktFormat():
         }
 
 
-class ConnCtrlPktFormat():
+class ConnCtrlPktFormat(BasePktFormat):
 
     ''' The format of connection controlling packets' body
     '''

@@ -3,6 +3,7 @@
 
 import json
 import uuid
+import socket
 import hashlib
 
 
@@ -177,6 +178,12 @@ class MetaEnum(type):
 
 def gen_uuid():
     return str(uuid.uuid4())
+
+
+def get_localhost_ip():
+    return socket.gethostbyname(
+        socket.gethostname()
+    )
 
 
 # from tornado.util

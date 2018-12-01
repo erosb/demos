@@ -39,6 +39,7 @@ class UDPPacket(ObjectifiedDict):
             type: int,
             data: bytes,
             fields: ObjectifiedDict,
+            byte_fields: ObjectifiedDict,
             src: {
                 addr: str,
                 port: int,
@@ -59,6 +60,8 @@ class UDPPacket(ObjectifiedDict):
     The "data" field is bytes which is going to transmit or just received.
 
     The "fields" field is the data that hasn't been wrapped or has been parsed.
+    The "byte_fields" fields is a duplicate of the "fields" field,
+    the difference is data in this field is bytes type (after struct.pack).
     '''
 
     def __init__(self, **kwargs):
@@ -66,6 +69,12 @@ class UDPPacket(ObjectifiedDict):
             if kw not in kwargs:
                 kwargs.update(
                     {kw: {'addr': None, 'port': None}}
+                )
+
+        for kw in ['fields', 'byte_fields']:
+            if kw not in kwargs:
+                kwargs.update(
+                    {kw: ObjectifiedDict()}
                 )
 
         if 'valid' not in kwargs:

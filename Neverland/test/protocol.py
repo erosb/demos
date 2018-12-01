@@ -30,7 +30,20 @@ base_wrapper = ProtocolWrapper(
 
 class PWTest(unittest.TestCase):
 
-    def test_0_wrap_unwrap(self):
+    def test_0_sort_calculators(self):
+        fmt = HeaderFormat
+        fmt.gen_fmt(config)
+        fmt.sort_calculators()
+
+        print('================== test_0_sort_calculators ==================')
+        for field_name, calculator in fmt.__calc_definition__.items():
+            print('--------------------------------------')
+            print(f"field: {field_name}")
+            print(f"calculator: {calculator}")
+        print('========================= test_0 ends =======================\n')
+
+
+    def test_1_wrap_unwrap(self):
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          salt=b'a'*8,

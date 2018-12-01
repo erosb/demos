@@ -1,7 +1,11 @@
 {
+	"identification": "",
+
 	"listen_addr": "0.0.0.0",
 	"listen_port": 17151,
 	"ipv6": false,
+
+	"cluster_entrance": "192.168.122.22",
 
 	"worker_amount": 2,
 
