@@ -103,8 +103,7 @@ class ComplexedFormat(BasePktFormat):
     def combine_fmt(self, fmt_cls):
         ''' combine a new packet format class
 
-        Just like dict.update.
-        Uuuhh, well, it has nothing different with dict.update.
+        Works like dict.update
         '''
 
         self.__fmt__.update(fmt_cls.__fmt__)
