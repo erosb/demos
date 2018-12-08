@@ -15,22 +15,25 @@ class UDPReceiver():
     ''' A normal implementation of the afferents
     '''
 
-    def __init__(self, config):
+    def __init__(self, config, listen_addr=None, listen_port=None):
         self.config = config
         self._sock = self.create_socket()
         self._fd = self._sock.fileno()
 
+        self.listen_addr = listen_addr or self.config.listen_addr
+        self.listen_port = listen_port or self.config.listen_port
+
     def create_socket(self):
         af, type_, proto, canon, sa = socket.getaddrinfo(
-                                          host=self.config.listen_addr,
-                                          port=self.config.listen_port,
+                                          host=self.listen_addr,
+                                          port=self.listen_port,
                                           proto=socket.SOL_UDP,
                                       )[0]
 
         sock = socket.socket(af, type_, proto)
         sock.setblocking(False)
         sock.bind(
-            (self.config.listen_addr, self.config.listen_port)
+            (self.listen_addr, self.listen_port)
         )
         return sock
 

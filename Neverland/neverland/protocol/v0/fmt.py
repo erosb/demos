@@ -142,7 +142,7 @@ class CtrlPktFormat(BasePktFormat):
             # The format of content field is stringified JSON.
             'content': FieldDefinition(
                            length = UDP_DATA_LEN,
-                           type   = FieldTypes.PY_BYTES,
+                           type   = FieldTypes.PY_DICT,
                        ),
         }
 

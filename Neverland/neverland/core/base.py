@@ -6,9 +6,10 @@ import select
 import logging
 
 from neverland.pkt import UDPPacket, PktTypes
-from neverland.utils import ObjectifiedDict
+from neverland.utils import ObjectifiedDict, get_localhost_ip
 from neverland.exceptions import DropPakcet, ConfigError
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
+from neverland.core.status import ClusterControllingStatus
 
 
 logger = logging.getLogger('main')
@@ -36,7 +37,7 @@ class BaseCore():
 
     def __init__(
         self, config, efferent, logic_handler,
-        protocol_wrapper, afferents=tuple(),
+        protocol_wrapper, main_afferent, minor_afferents=tuple(),
     ):
         ''' constructor
 
@@ -44,20 +45,28 @@ class BaseCore():
         :param efferent: an efferent instance
         :param logic_handler: a logic handler instance
         :param protocol_wrapper: a protocol wrapper instance
-        :param afferents: a list of afferents,
-                          any iterable type contains afferent instances
+        :param main_afferent: the main afferent
+        :param minor_afferents: a group of minor afferents,
+                                any iterable type contains afferent instances
         '''
 
         self._epoll = select.epoll()
         self.afferent_mapping = {}
 
         self.config = config
+        self.main_afferent = main_afferent
         self.efferent = efferent
         self.logic_handler = logic_handler
         self.protocol_wrapper = protocol_wrapper
 
-        for afferent in afferents:
+        self.plug_afferent(self.main_afferent)
+
+        for afferent in minor_afferents:
             self.plug_afferent(afferent)
+
+        # status of cluster controlling
+        # enumerated in neverland.core.status.ClusterCtrlStatus
+        self._ctrl_status = ClusterControllingStatus.INIT
 
     def plug_afferent(self, afferent):
         self._epoll.register(afferent.fd, self.EV_MASK)
@@ -89,28 +98,63 @@ class BaseCore():
         if identification is None:
             raise ConfigError("identification is not defined")
 
+        local_ip = get_localhost_ip()
+        port = self.main_afferent.listen_port
+        src = (local_ip, port)
+
         content = {"identification": identification}
         subject = ClusterControllingSubjects.JOIN_CLUSTER
 
         pkt = UDPPacket()
-        ## TODO not done yet
         pkt.fields = ObjectifiedDict(
-                         salt=None,
-                         mac=None,
-                         serial=None,
-                         time=None,
                          type=PktTypes.CTRL,
                          diverged=0x01,
-                         src=None,
+                         src=src,
                          dest=entrance,
                          subject=subject,
                          content=content,
                      )
+        pkt.next_hop = entrance
+
+        pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)
+
+        self._ctrl_status = ClusterControllingStatus.WAITING_FOR_JOIN
 
     def leave_cluster(self):
         ''' here defines how the nodes detach from the neverland cluster
         '''
+
+        entrance = self.config.cluster_entrance
+        identification = self.config.identification
+
+        if entrance is None:
+            raise ConfigError("cluster_entrance is not defined")
+        if identification is None:
+            raise ConfigError("identification is not defined")
+
+        local_ip = get_localhost_ip()
+        port = self.main_afferent.listen_port
+        src = (local_ip, port)
+
+        content = {"identification": identification}
+        subject = ClusterControllingSubjects.LEAVE_CLUSTER
+
+        pkt = UDPPacket()
+        pkt.fields = ObjectifiedDict(
+                         type=PktTypes.CTRL,
+                         diverged=0x01,
+                         src=src,
+                         dest=entrance,
+                         subject=subject,
+                         content=content,
+                     )
+        pkt.next_hop = entrance
+
+        pkt = self.protocol_wrapper.wrap(pkt)
+        self.efferent.transmit(pkt)
+
+        self._ctrl_status = ClusterControllingStatus.WAITING_FOR_LEAVE
 
     def handle_pkt(self, pkt):
         pkt = self.protocol_wrapper.unwrap(pkt)

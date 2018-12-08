@@ -2,6 +2,7 @@
 #coding: utf-8
 
 import os
+import json
 import time
 import struct
 
@@ -298,6 +299,14 @@ class BaseProtocolWrapper():
                 raise PktWrappingError(
                     f'{type(value)} cannot be packed as PY_BYTES'
                 )
+        if field_type == FieldTypes.PY_DICT:
+            if isinstance(value, dict):
+                data = json.dumps(value)
+                return data.encode()
+            else:
+                raise PktWrappingError(
+                    f'{type(value)} cannot be packed as PY_DICT'
+                )
 
     def unwrap(self, pkt):
         ''' unpack a raw UDP packet
@@ -399,3 +408,10 @@ class BaseProtocolWrapper():
             return None
         if field_type == FieldTypes.PY_BYTES:
             return data
+        if field_type == FieldTypes.PY_DICT:
+            try:
+                return json.loads(data.decode())
+            except json.decoder.JSONDecodeError:
+                raise InvalidPkt('failed to parse a PY_DICT field')
+            except UnicodeDecodeError:
+                raise InvalidPkt('failed to decode a PY_DICT field')

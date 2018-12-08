@@ -27,6 +27,7 @@ class FieldTypes(metaclass=MetaEnum):
     STRUCT_IPV6_SA = 0x32
 
     PY_BYTES = 0x41
+    PY_DICT = 0x42
 
 
 class UDPPacket(ObjectifiedDict):
@@ -41,10 +42,6 @@ class UDPPacket(ObjectifiedDict):
             fields: ObjectifiedDict,
             byte_fields: ObjectifiedDict,
             src: {
-                addr: str,
-                port: int,
-            },
-            dest: {
                 addr: str,
                 port: int,
             },
