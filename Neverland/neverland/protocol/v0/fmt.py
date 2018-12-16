@@ -54,12 +54,7 @@ class HeaderFormat(BasePktFormat):
                        calc_priority = 0xff,
                    ),
 
-            # Each UDP packet should have a serial number as its identifier.
-            # (no matter which type it is)
-            # The max value of an 8 bytes long integer is 18446744073709551615.
-            # This means that if we send one billion packets per second then we
-            # need about 585 years to make this serial overflow.
-            # (2 ** 64 - 1) / (1000000000 * 3600 * 24 * 365) == 584.942417355072
+            # Each UDP packet shall have a serial number as its identifier.
             'serial': FieldDefinition(
                           length = 8,
                           type   = FieldTypes.STRUCT_U_LONG_LONG,
