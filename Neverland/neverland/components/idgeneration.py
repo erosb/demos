@@ -16,7 +16,7 @@ class IDGenerator():
 
     Format:
 
-        |          A - 41 bits          | B - 8 bits | C - 6 bits | D - 8 bits |
+        |          A - 41 bits          | B - 8 bits | C - 6 bits | D - 9 bits |
         |-------------------------------|------------|------------|------------|
 
         Fragment A:
