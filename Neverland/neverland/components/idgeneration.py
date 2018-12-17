@@ -77,8 +77,10 @@ class IDGenerator():
                 self.__sequence += 1
             else:
                 self._sleep_to_next_millisecond()
-                self.__sequence = 0
+
+                ts = self._get_current_ts()
                 self.__last_ts = ts
+                self.__sequence = 0
         else:
             self.__sequence = 0
             self.__last_ts = ts
