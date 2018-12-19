@@ -1,6 +1,9 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
+from neverland.pkt import PktTypes
+from neverland.exceptions import DropPakcet
+
 
 class BaseLogicHandler():
 
@@ -13,5 +16,25 @@ class BaseLogicHandler():
     def __init__(self, config):
         self.config = config
 
+    def init_shm(self):
+        ''' initialize the shared memory
+        '''
+
     def handle_logic(self, pkt):
+        if pkt.fields.type == PktTypes.DATA:
+            return self.handle_data(pkt)
+        elif pkt.fields.type == PktTypes.CTRL:
+            return self.handle_ctrl(pkt)
+        elif pkt.fields.type == PktTypes.CONN_CTRL:
+            return self.handle_conn_ctrl
+        else:
+            raise DropPakcet
+
+    def handle_data(self, pkt):
+        pass
+
+    def handle_ctrl(self, pkt):
+        pass
+
+    def handle_conn_ctrl(self, pkt):
         pass

@@ -12,3 +12,12 @@ class NodeContext():
 
     # The shared memory manager instance
     shm_mgr = None
+
+    # The core instance
+    core = None
+
+    # pid of the worker
+    pid = None
+
+    # local IP address
+    local_ip = None

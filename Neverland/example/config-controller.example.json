@@ -1,5 +1,5 @@
 {
-	"identification": "",
+	"identification": "controller",
 
 	"listen_addr": "0.0.0.0",
 	"listen_port": 17151,
@@ -17,5 +17,7 @@
 	"shm_log_path": "/var/log/ic_shm.log",
 	"main_log_path": "/var/log/ic.log",
 
-	"cluster_entrance": "192.168.122.22"
+	"cluster_nodes": {
+		"relay-0000": "192.168.122.23"
+	}
 }

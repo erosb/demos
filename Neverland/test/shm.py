@@ -9,7 +9,7 @@ import unittest
 
 import __code_path__
 from neverland.utils import ObjectifiedDict
-from neverland.components.sharedmem import SharedMemoryManager, ContainerTypes
+from neverland.components.sharedmem import SharedMemoryManager, SHMContainerTypes
 
 
 config = ObjectifiedDict(
@@ -28,26 +28,29 @@ KEY = 'k0'
 DATA = [
     {
         'name': 'testing-list',
-        'type': ContainerTypes.LIST,
+        'type': SHMContainerTypes.LIST,
         '2_create': [1, 2, 3],
-        '2_remove': [1, 2],
+        '2_add': [4],
+        '2_remove': [1, 2, 4],
         'remaining': 3,
         'remaining_key': 0,
     },
     {
         'name': 'testing-set',
-        'type': ContainerTypes.SET,
+        'type': SHMContainerTypes.SET,
         '2_create': [1, 2, 3],
-        '2_remove': [1, 2],
+        '2_add': {4,},
+        '2_remove': [1, 2, 4],
         'remaining': 3,
         'remaining_key': 0,
     },
     {
         'name': 'testing-dict',
-        'type': ContainerTypes.DICT,
+        'type': SHMContainerTypes.DICT,
         # '2_create': None,
         '2_create': {'a': 1, 'b': 2, 'c': 3},
-        '2_remove': ['a', 'b'],
+        '2_add': {'d': 4},
+        '2_remove': ['a', 'b', 'd'],
         'remaining': 3,
         'remaining_key': 'c',
     },
@@ -83,6 +86,16 @@ class SHMTest(unittest.TestCase):
                 print(f'\n==================={td["name"]}===================\n')
                 resp = shm_mgr.create_key(KEY, td['type'], td['2_create'])
                 print('\n-----------Create-----------')
+                print(resp)
+                self.assertTrue(resp.get('succeeded'))
+
+                resp = shm_mgr.read_key(KEY)
+                print('\n-----------Read-----------')
+                print(resp)
+                self.assertTrue(resp.get('succeeded'))
+
+                resp = shm_mgr.add_value(KEY, td['2_add'])
+                print('\n-----------Add-----------')
                 print(resp)
                 self.assertTrue(resp.get('succeeded'))
 

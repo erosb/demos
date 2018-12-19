@@ -7,6 +7,7 @@ import time
 import signal as sig
 import logging
 
+from neverland.utils import get_localhost_ip
 from neverland.node import ROLES
 from neverland.node.context import NodeContext
 from neverland.core.client import ClientCore
@@ -158,13 +159,16 @@ class BaseNode():
             os.kill(ppid, sig.SIGTERM)
             os.setsid()
 
-    def _create_context(self):
-        NodeContext.shm_mgr = self.shm_mgr
-
     def get_context():
         return NodeContext
 
-    def load_modules(self):
+    def _create_context(self):
+        NodeContext.shm_mgr = self.shm_mgr
+        NodeContext.core = self.core
+        NodeContext.pid = os.getpid()
+        NodeContext.local_ip = get_localhost_ip()
+
+    def _load_modules(self):
         self.shm_mgr = SharedMemoryManager(self.config)
 
         self.afferent_cls = AFFERENT_MAPPING[self.role]
@@ -186,16 +190,21 @@ class BaseNode():
         self.core_cls = CORE_MAPPING.get(self.role)
         self.core = core_cls(
                         self.config,
-                        afferents=[self.main_afferent],
+                        main_afferent=self.main_afferent,
+                        minor_afferents=[],
                         efferent=self.efferent,
                         logic_handler=self.logic_handler,
                         protocol_wrapper=self.protocol_wrapper,
                     )
 
+    def _init_modules(self):
+        ''' an additional init step for part of modules
+        '''
+
+        self.logic_handler.init_shm()
+
     def run(self):
         self.daemonize()
-        self.load_modules()
-        self._create_context()
 
         # start SharedMemoryManager worker
         pid = os.fork()
@@ -217,6 +226,9 @@ class BaseNode():
                 raise OSError('fork failed')
             elif pid == 0:
                 self._sig_normal_worker()
+                self._load_modules()
+                self._create_context()
+                self._init_modules()
                 self.core.run()
                 return  # the sub-process ends here
             else:

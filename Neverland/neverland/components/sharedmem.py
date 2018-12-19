@@ -19,7 +19,7 @@ from neverland.utils import MetaEnum, ObjectifiedDict, gen_uuid
 
 __all__ = [
     'Actions',
-    'ContainerTypes',
+    'SHMContainerTypes',
     'SharedMemoryManager',
 ]
 
@@ -148,7 +148,7 @@ class Actions(metaclass=MetaEnum):
     REMOVE = 0x12
 
 
-class ContainerTypes(metaclass=MetaEnum):
+class SHMContainerTypes(metaclass=MetaEnum):
 
     STR = 0x01
     INT = 0x02
@@ -162,26 +162,26 @@ class ContainerTypes(metaclass=MetaEnum):
 
 
 PY_TYPE_MAPPING = {
-    ContainerTypes.STR: str,
-    ContainerTypes.INT: int,
-    ContainerTypes.FLOAT: float,
-    ContainerTypes.BOOL: bool,
-    ContainerTypes.SET: set,
-    ContainerTypes.LIST: list,
-    ContainerTypes.DICT: dict,
+    SHMContainerTypes.STR: str,
+    SHMContainerTypes.INT: int,
+    SHMContainerTypes.FLOAT: float,
+    SHMContainerTypes.BOOL: bool,
+    SHMContainerTypes.SET: set,
+    SHMContainerTypes.LIST: list,
+    SHMContainerTypes.DICT: dict,
 }
 
 
 # we need this to make JSON types compatible with Python types
 # in verification and updating values
 COMPATIBLE_TYPE_MAPPING = {
-    ContainerTypes.STR: str,
-    ContainerTypes.INT: int,
-    ContainerTypes.FLOAT: float,
-    ContainerTypes.BOOL: bool,
-    ContainerTypes.SET: list,
-    ContainerTypes.LIST: list,
-    ContainerTypes.DICT: ObjectifiedDict,
+    SHMContainerTypes.STR: str,
+    SHMContainerTypes.INT: int,
+    SHMContainerTypes.FLOAT: float,
+    SHMContainerTypes.BOOL: bool,
+    SHMContainerTypes.SET: list,
+    SHMContainerTypes.LIST: list,
+    SHMContainerTypes.DICT: ObjectifiedDict,
 }
 
 
@@ -341,9 +341,9 @@ class SharedMemoryManager():
         compatible_type = COMPATIBLE_TYPE_MAPPING.get(type_)
 
         if value is not None and (
-            (type_ not in ContainerTypes) or
+            (type_ not in SHMContainerTypes) or
             (
-                type_ in ContainerTypes and
+                type_ in SHMContainerTypes and
                 not isinstance(value, compatible_type)
             )
         ):
@@ -356,7 +356,7 @@ class SharedMemoryManager():
         )
 
         if value is not None:
-            if type_ <= ContainerTypes.BOOL:
+            if type_ <= SHMContainerTypes.BOOL:
                 self.resources[key] = value
             else:
                 self._add_value_2_container(key, value)
@@ -581,6 +581,15 @@ class SharedMemoryManager():
             sys.exit(1)
 
     def create_key(self, key, type_, value=None):
+        ''' create a new container
+
+        :param key: the container key
+        :param type_: type of container, enumerated in SHMContainerTypes
+        :param value: the initial value, type of the value should be same with
+                      the container type
+        '''
+
+        value = list(value) if type_ == SHMContainerTypes.SET else value
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.CREATE,
@@ -590,16 +599,40 @@ class SharedMemoryManager():
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def add_value(self, key, *values):
+    def add_value(self, key, value):
+        ''' add values into the container
+
+        allowed container types:
+            SET, LIST, DICT
+
+        :param key: the container key
+        :param value: values to be added,
+                      type of the value should be same with the container type
+        '''
+
+        value = list(value) if isinstance(value, set) else value
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.ADD,
             key=key,
-            value=list(values),
+            value=value,
         )
         return self.read_response(self.current_connection.conn_id)
 
     def remove_value(self, key, *values):
+        ''' remove values from the container
+
+        :param key: the container key
+        :param *values: a group of values that need be removed.
+
+                        When the container type is SET or LIST, values is
+                        a group of value in the container.
+                        
+                        When the container type is DICT, values is a group
+                        of keys in the dict container.
+
+        '''
+
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.REMOVE,
