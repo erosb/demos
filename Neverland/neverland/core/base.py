@@ -109,7 +109,6 @@ class BaseCore():
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          type=PktTypes.CTRL,
-                         diverged=0x00,
                          src=src,
                          dest=entrance,
                          subject=subject,
@@ -144,7 +143,6 @@ class BaseCore():
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          type=PktTypes.CTRL,
-                         diverged=0x00,
                          src=src,
                          dest=entrance,
                          subject=subject,

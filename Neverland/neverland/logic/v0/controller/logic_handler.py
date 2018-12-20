@@ -69,7 +69,6 @@ class ControllerLogicHandler(BaseLogicHandler):
         resp_pkt = UDPPacket()
         resp_pkt.fields = ObjectifiedDict(
                               type=PktTypes.CTRL,
-                              diverged=0x00,
                               src=src,
                               dest=dest,
                               subject=ClusterControllingSubjects.RESPONSE,

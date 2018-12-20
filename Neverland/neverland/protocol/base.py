@@ -30,12 +30,12 @@ class BasePktFormat():
     The format of the __fmt__: {
 
         'field_name': ObjectifiedDict(
-                          length        = <length of the field>,
-                          type          = <field type, enumerated in FieldTypes>,
-                          default       = <default value of the field>,
-                          calculator    = <specify a function to calculate the field>,
-                          calc_priority = <an integer, smaller number means higher priority>
-                      )
+             length        = <length of the field>,
+             type          = <field type, enumerated in FieldTypes>,
+             default       = <default value of the field>,
+             calculator    = <specify a function to calculate the field>,
+             calc_priority = <an integer, smaller number means higher priority>,
+         )
 
     }
 
