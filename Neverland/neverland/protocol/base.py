@@ -158,9 +158,23 @@ class BaseProtocolWrapper():
 
     ''' The ProtocolWrapper class
 
-    This kind of classes are responsible for converting the
-    neverland.pkt.UDPPacket object into real UDP packets (bytes) which
-    could be a valid UDP packet that can be forwarded by Neverland nodes.
+    ProtocolWrappers are used in wrapping or unwrapping the packets.
+    They pack the field values into bytes that can be transmitted or
+    parse the received bytes into defined fields.
+
+    Notice about the struct std-lib:
+        As the Python doc says:
+            Native byte order is big-endian or little-endian,
+            depending on the host system.
+            For example, Intel x86 and AMD64 (x86-64) are little-endian;
+
+        Neverland is supposed to run only in x86 or x86_64 environments.
+        In current implementation, we used the native packing options in
+        most of invoking of strcut.pack, and it will help us to ensure
+        the length of the packed bytes.
+
+        So, in this case, current implementation of ProtocolWrappers are
+        totally dependent on the hardware architecture.
     '''
 
     def __init__(
