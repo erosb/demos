@@ -75,7 +75,7 @@ class HeaderFormat(BasePktFormat):
                     ),
 
             # Whether this packet has been diverged,
-            # 0x01 for True and 0x02 for False
+            # 0x01 for True and 0x00 for False
             'diverged': FieldDefinition(
                             length = 1,
                             type   = FieldTypes.STRUCT_U_CHAR,

@@ -8,7 +8,7 @@ import signal as sig
 import logging
 
 from neverland.utils import get_localhost_ip
-from neverland.node import ROLES
+from neverland.node import Roles
 from neverland.node.context import NodeContext
 from neverland.core.client import ClientCore
 from neverland.core.relay import RelayCore
@@ -30,28 +30,28 @@ from neverland.protocol.v0.fmt import (
 from neverland.components.sharedmem import SharedMemoryManager
 
 
-logger = logging.getLogger('main')
+logger = logging.getLogger('Main')
 
 
 AFFERENT_MAPPING = {
-    ROLES.client: ClientUDPReceiver,
-    ROLES.relay: UDPReceiver,
-    ROLES.outlet: UDPReceiver,
-    ROLES.controller: UDPReceiver,
+    Roles.CLIENT: ClientUDPReceiver,
+    Roles.RELAY: UDPReceiver,
+    Roles.OUTLET: UDPReceiver,
+    Roles.CONTROLLER: UDPReceiver,
 }
 
 LOGIC_HANDLER_MAPPING = {
-    ROLES.client: ClientLogicHandler,
-    ROLES.relay: RelayLogicHandler,
-    ROLES.outlet: OutletLogicHandler,
-    ROLES.controller: ControllerLogicHandler,
+    Roles.CLIENT: ClientLogicHandler,
+    Roles.RELAY: RelayLogicHandler,
+    Roles.OUTLET: OutletLogicHandler,
+    Roles.CONTROLLER: ControllerLogicHandler,
 }
 
 CORE_MAPPING = {
-    ROLES.client: ClientCore,
-    ROLES.relay: RelayCore,
-    ROLES.outlet: OutletCore,
-    ROLES.controller: ControllerCore,
+    Roles.CLIENT: ClientCore,
+    Roles.RELAY: RelayCore,
+    Roles.OUTLET: OutletCore,
+    Roles.CONTROLLER: ControllerCore,
 }
 
 

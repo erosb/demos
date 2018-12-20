@@ -13,7 +13,7 @@ from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.core.status import ClusterControllingStatus
 
 
-logger = logging.getLogger('main')
+logger = logging.getLogger('Main')
 
 
 class BaseCore():
@@ -109,7 +109,7 @@ class BaseCore():
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          type=PktTypes.CTRL,
-                         diverged=0x01,
+                         diverged=0x00,
                          src=src,
                          dest=entrance,
                          subject=subject,
@@ -144,7 +144,7 @@ class BaseCore():
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          type=PktTypes.CTRL,
-                         diverged=0x01,
+                         diverged=0x00,
                          src=src,
                          dest=entrance,
                          subject=subject,

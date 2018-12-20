@@ -41,7 +41,7 @@ class UDPPacket(ObjectifiedDict):
             data: bytes,
             fields: ObjectifiedDict,
             byte_fields: ObjectifiedDict,
-            src: {
+            previous_hop: {
                 addr: str,
                 port: int,
             },
@@ -58,11 +58,11 @@ class UDPPacket(ObjectifiedDict):
 
     The "fields" field is the data that hasn't been wrapped or has been parsed.
     The "byte_fields" fields is a duplicate of the "fields" field,
-    the difference is data in this field is bytes type (after struct.pack).
+    the difference is data in this field is bytes.
     '''
 
     def __init__(self, **kwargs):
-        for kw in ['src', 'dest', 'next_hop']:
+        for kw in ['previous_hop', 'next_hop']:
             if kw not in kwargs:
                 kwargs.update(
                     {kw: {'addr': None, 'port': None}}

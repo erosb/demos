@@ -18,6 +18,9 @@
 	"main_log_path": "/var/log/ic.log",
 
 	"cluster_nodes": {
-		"relay-0000": "192.168.122.23"
+		"relay-0000": {
+			"ip": "192.168.122.23",
+			"role": "relay"
+		}
 	}
 }

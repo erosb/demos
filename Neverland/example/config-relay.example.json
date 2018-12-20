@@ -17,5 +17,8 @@
 	"shm_log_path": "/var/log/ic_shm.log",
 	"main_log_path": "/var/log/ic.log",
 
-	"cluster_entrance": "192.168.122.22"
+	"cluster_entrance": {
+		"ip": "192.168.122.22",
+		"port": 17151
+	}
 }

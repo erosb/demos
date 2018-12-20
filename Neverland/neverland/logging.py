@@ -11,7 +11,7 @@ LOGGER_NAME_LOGPATH_MAPPING = {
 }
 
 
-logger = logging.getLogger('main')
+logger = logging.getLogger('Main')
 
 
 def init_all_loggers(log_level='info'):

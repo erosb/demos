@@ -10,6 +10,8 @@ class ClusterControllingSubjects(metaclass=MetaEnum):
     # 
     # Required content: {
     #                       "identification": str,
+    #                       "ip": str,
+    #                       "listen_port": int,
     #                   }
     #
     # Response body: {
