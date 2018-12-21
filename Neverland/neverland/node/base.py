@@ -203,6 +203,9 @@ class BaseNode():
 
         self.logic_handler.init_shm()
 
+        self.core.init_shm()
+        self.core.self_allocate_core_id()
+
     def run(self):
         self.daemonize()
 

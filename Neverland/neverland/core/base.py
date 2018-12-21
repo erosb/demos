@@ -7,10 +7,12 @@ import select
 import logging
 
 from neverland.pkt import UDPPacket, PktTypes
+from neverland.node.context import NodeContext
 from neverland.utils import ObjectifiedDict, get_localhost_ip
 from neverland.exceptions import DropPakcet, ConfigError
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.core.status import ClusterControllingStatus
+from neverland.components.sharedmem import SHMContainerTypes
 
 
 logger = logging.getLogger('Main')
@@ -36,6 +38,13 @@ class BaseCore():
 
     EV_MASK = select.EPOLLIN
 
+    SHM_SOCKET_NAME_TEMPLATE = 'SHM-Core-%d.socket'
+
+    # SHM container for containing allocated core id
+    # data structure:
+    #     [1, 2, 3, 4]
+    SHM_KEY_CORE_ID = 'Core_id'
+
     def __init__(
         self, config, efferent, logic_handler,
         protocol_wrapper, main_afferent, minor_afferents=tuple(),
@@ -51,8 +60,11 @@ class BaseCore():
                                 any iterable type contains afferent instances
         '''
 
+        self.core_id = None
         self._epoll = select.epoll()
         self.afferent_mapping = {}
+
+        self.shm_mgr = NodeContext.shm_mgr
 
         self.config = config
         self.main_afferent = main_afferent
@@ -68,6 +80,33 @@ class BaseCore():
         # status of cluster controlling
         # enumerated in neverland.core.status.ClusterCtrlStatus
         self._ctrl_status = ClusterControllingStatus.INIT
+
+    def init_shm(self):
+        self.shm_mgr.connect(
+            self.SHM_SOCKET_NAME_TEMPLATE % self.NodeContext.pid
+        )
+        self.shm_mgr.create_key(
+            self.SHM_KEY_CORE_ID,
+            SHMContainerTypes.LIST,
+        )
+
+    def self_allocate_core_id(self):
+        ''' Let the core pick up an id for itself
+        '''
+
+        allocated_id = self.shm_mgr.read_key(self.SHM_KEY_CORE_ID)
+
+        if len(allocated_id) == 0:
+            id_ = 0
+        else:
+            last_id = allocated_id[-1]
+            id_ = last_id + 1
+
+        self.shm_mgr.add_value(
+            self.SHM_KEY_CORE_ID,
+            [id_],
+        )
+        self.core_id = id_
 
     def plug_afferent(self, afferent):
         self._epoll.register(afferent.fd, self.EV_MASK)
