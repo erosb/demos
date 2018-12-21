@@ -2,7 +2,6 @@
 #coding: utf-8
 
 import os
-import sys
 import json
 import select
 import socket
@@ -10,6 +9,7 @@ import logging
 
 from neverland.exceptions import (
     AddressAlreadyInUse,
+    SharedMemoryError,
     SHMResponseTimeout,
     SHMWorkerNotConnected,
     SHMWorkerConnectFailed,
@@ -520,7 +520,7 @@ class SharedMemoryManager():
             raise SHMWorkerConnectFailed(MSG_CONN_FAILED)
         except (UnicodeDecodeError, ValueError):
             logger.error(MSG_INVALID_DATA)
-            sys.exit(1)
+            raise SharedMemoryError(MSG_INVALID_DATA)
 
         if not data.get('succeeded'):
             logger.error(
@@ -578,7 +578,7 @@ class SharedMemoryManager():
             raise SHMResponseTimeout(MSG_TIMEOUT)
         except (UnicodeDecodeError, ValueError):
             logger.error(MSG_INVALID_DATA)
-            sys.exit(1)
+            raise SharedMemoryError(MSG_INVALID_DATA)
 
     def create_key(self, key, type_, value=None):
         ''' create a new container
