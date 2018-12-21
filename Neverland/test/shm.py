@@ -13,7 +13,7 @@ from neverland.components.sharedmem import SharedMemoryManager, SHMContainerType
 
 
 config = ObjectifiedDict(
-             shm_socket_dir='/tmp/ic_shm_sock/',
+             shm_socket_dir='/tmp/nl_shm_sock/',
              shm_manager_socket_name='manager',
          )
 
@@ -57,71 +57,109 @@ DATA = [
 ]
 
 
+worker_pid = None
+shm_mgr = None
+
+
+def launch_shm_worker():
+    global worker_pid, shm_mgr
+
+    pid = os.fork()
+
+    if pid == -1:
+        raise OSError('fork failed, unable to run SharedMemoryManager')
+
+    # run SHM worker in the child process
+    elif pid == 0:
+        shm_mgr = SharedMemoryManager(config, sensitive=True)
+        shm_mgr.run_as_worker()
+
+    # send testing request in the parent process
+    else:
+        # wait for shm worker
+        time.sleep(1)
+        worker_pid = pid
+
+    return pid
+
+
 # Test case for SharedMemoryManager
 class SHMTest(unittest.TestCase):
 
-    def test_0_all_in_one(self):
-        pid = os.fork()
+    def test_0_except_set(self):
+        shm_mgr = SharedMemoryManager(config)
+        shm_mgr.connect('test')
+        print('conn_id: ', shm_mgr.current_connection.conn_id)
+        self.assertIsInstance(shm_mgr.current_connection.conn_id, str)
 
-        if pid == -1:
-            raise OSError('fork failed, unable to run SharedMemoryManager')
+        for td in DATA:
+            print(f'\n==================={td["name"]}===================\n')
+            resp = shm_mgr.create_key(KEY, td['type'], td['2_create'])
+            print('\n-----------Create-----------')
+            print(resp)
+            self.assertTrue(resp.get('succeeded'))
 
-        # run SHM worker in the child process
-        elif pid == 0:
-            shm_mgr = SharedMemoryManager(config)
-            shm_mgr.run_as_worker()
+            resp = shm_mgr.read_key(KEY)
+            print('\n-----------Read-----------')
+            print(resp)
+            self.assertTrue(resp.get('succeeded'))
 
-        # send testing request in the parent process
-        else:
-            # wait for worker
-            time.sleep(1)
-            worker_pid = pid
+            resp = shm_mgr.add_value(KEY, td['2_add'])
+            print('\n-----------Add-----------')
+            print(resp)
+            self.assertTrue(resp.get('succeeded'))
 
-            shm_mgr = SharedMemoryManager(config)
-            shm_mgr.connect('test')
-            print('conn_id: ', shm_mgr.current_connection.conn_id)
-            self.assertIsInstance(shm_mgr.current_connection.conn_id, str)
+            resp = shm_mgr.read_key(KEY)
+            print('\n-----------Read-----------')
+            print(resp)
+            self.assertTrue(resp.get('succeeded'))
 
-            for td in DATA:
-                print(f'\n==================={td["name"]}===================\n')
-                resp = shm_mgr.create_key(KEY, td['type'], td['2_create'])
-                print('\n-----------Create-----------')
-                print(resp)
-                self.assertTrue(resp.get('succeeded'))
+            resp = shm_mgr.remove_value(KEY, *td['2_remove'])
+            print('\n-----------Remove-----------')
+            print(resp)
+            self.assertTrue(resp.get('succeeded'))
 
-                resp = shm_mgr.read_key(KEY)
-                print('\n-----------Read-----------')
-                print(resp)
-                self.assertTrue(resp.get('succeeded'))
+            resp = shm_mgr.read_key(KEY)
+            print('\n-----------Read-----------')
+            print(resp)
+            self.assertTrue(resp.get('succeeded'))
+            self.assertEqual(
+                resp.get('value')[td['remaining_key']],
+                td['remaining'],
+            )
 
-                resp = shm_mgr.add_value(KEY, td['2_add'])
-                print('\n-----------Add-----------')
-                print(resp)
-                self.assertTrue(resp.get('succeeded'))
+        shm_mgr.disconnect()
+        self.assertEqual(shm_mgr.current_connection, None)
 
-                resp = shm_mgr.read_key(KEY)
-                print('\n-----------Read-----------')
-                print(resp)
-                self.assertTrue(resp.get('succeeded'))
+    def test_1_set(self):
+        KEY_FOR_SET = 'set_test'
+        VALUE_FOR_SET = 'aaaaaaaaaaaaa'
 
-                resp = shm_mgr.remove_value(KEY, *td['2_remove'])
-                print('\n-----------Remove-----------')
-                print(resp)
-                self.assertTrue(resp.get('succeeded'))
+        print('\n\n=====================set-value====================')
+        shm_mgr = SharedMemoryManager(config)
+        shm_mgr.connect('test_set')
+        print('conn_id: ', shm_mgr.current_connection.conn_id)
+        self.assertIsInstance(shm_mgr.current_connection.conn_id, str)
 
-                resp = shm_mgr.read_key(KEY)
-                print('\n-----------Read-----------')
-                print(resp)
-                self.assertTrue(resp.get('succeeded'))
-                self.assertEqual(
-                    resp.get('value')[td['remaining_key']],
-                    td['remaining'],
-                )
+        resp = shm_mgr.create_key(KEY_FOR_SET, SHMContainerTypes.STR)
+        self.assertTrue(resp.get('succeeded'))
 
-            shm_mgr.disconnect()
-            self.assertEqual(shm_mgr.current_connection, None)
-            os.kill(worker_pid, sig.SIGTERM)
+        resp = shm_mgr.set_value(KEY_FOR_SET, VALUE_FOR_SET)
+        self.assertTrue(resp.get('succeeded'))
+
+        resp = shm_mgr.read_key(KEY_FOR_SET)
+        self.assertTrue(resp.get('succeeded'))
+        self.assertEqual(resp.get('value'), VALUE_FOR_SET)
+        print(resp)
+
+        shm_mgr.disconnect()
+        self.assertEqual(shm_mgr.current_connection, None)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    pid = launch_shm_worker()
+
+    # pid from fork
+    if pid > 0:
+        unittest.main()
+        os.kill(worker_pid, sig.SIGKILL)

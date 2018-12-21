@@ -87,6 +87,17 @@ The protocol of communication:
                 "value": any available type in JSON,
             }
 
+        if action in [SET]:
+            {
+                "conn_id": str,
+                "action": int,
+                "key": str,
+                "value": str/int/float/bool,
+            }
+
+            The SET action has been limited, it can only be used on
+            str/int/float/bool types.
+
         if action in [READ, CLEAN]:
             {
                 "conn_id": str,
@@ -138,8 +149,11 @@ class Actions(metaclass=MetaEnum):
     # read value from a key
     READ = 0x02
 
+    # change value of a key
+    SET = 0x03
+
     # add a new value into a key if the key points to a set/dict/list
-    ADD = 0x03
+    ADD = 0x04
 
     # completely remove a key from stored resources
     CLEAN = 0x11
@@ -195,7 +209,16 @@ class SharedMemoryManager():
 
     EV_MASK = select.EPOLLIN
 
-    def __init__(self, config):
+    def __init__(self, config, sensitive=False):
+        ''' Constructor
+
+        :param config: the config
+        :param sensitive: The sensitive mode will make the client become
+                          sensitive, it will raise an SharedMemoryError
+                          when the request is not successful.
+        '''
+
+        self.sensitive = sensitive
         self.config = config
         self.socket_dir = config.shm_socket_dir
 
@@ -367,16 +390,36 @@ class SharedMemoryManager():
         conn_id = data.conn_id
         key = data.key
 
+        if key not in self.resources:
+            return self._gen_response_json(conn_id=conn_id, succeeded=False)
+
         return self._gen_response_json(
             conn_id=conn_id,
             succeeded=True,
             value=self.get_compatible_value(key),
         )
 
+    def handle_set(self, data):
+        key = data.key
+        value = data.value
+        conn_id = data.conn_id
+
+        if key in self.resources:
+            if type(self.resources.get(key)) not in (int, float, bool, str):
+                return self._gen_response_json(conn_id=conn_id, succeeded=False)
+            else:
+                self.resources[key] = value
+                return self._gen_response_json(conn_id=conn_id, succeeded=True)
+        else:
+            return self._gen_response_json(conn_id=conn_id, succeeded=False)
+
     def handle_add(self, data):
         key = data.key
         value = data.value
         conn_id = data.conn_id
+
+        if key not in self.resources:
+            return self._gen_response_json(conn_id=conn_id, succeeded=False)
 
         try:
             self._add_value_2_container(key, value)
@@ -434,6 +477,8 @@ class SharedMemoryManager():
             return self.handle_create(data)
         if data.action == Actions.READ:
             return self.handle_read(data)
+        if data.action == Actions.SET:
+            return self.handle_set(data)
         if data.action == Actions.ADD:
             return self.handle_add(data)
         if data.action == Actions.CLEAN:
@@ -572,6 +617,9 @@ class SharedMemoryManager():
             if not isinstance(data, dict):
                 raise ValueError
 
+            if not data.get('succeeded') and self.sensitive:
+                raise SharedMemoryError('SHM Request unsuccessful')
+
             return data
         except socket.timeout:
             logger.error(MSG_TIMEOUT)
@@ -595,6 +643,24 @@ class SharedMemoryManager():
             action=Actions.CREATE,
             key=key,
             type=type_,
+            value=value,
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def set_value(self, key, value):
+        ''' change the value of a key
+
+        allowed container types:
+            STR, INT, FLOAT, BOOL
+
+        :param key: the container key
+        :param value: values to be set
+        '''
+
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.SET,
+            key=key,
             value=value,
         )
         return self.read_response(self.current_connection.conn_id)

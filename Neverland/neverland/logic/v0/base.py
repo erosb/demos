@@ -2,10 +2,10 @@
 #coding: utf-8
 
 from neverland.pkt import PktTypes
-from neverland.node.context import NodeContext
 from neverland.exceptions import DropPakcet
 from neverland.logic.base import BaseLogicHandler as _BaseLogicHandler
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
+from neverland.components.sharedmem import SharedMemoryManager
 
 
 class BaseLogicHandler(_BaseLogicHandler):
@@ -16,8 +16,7 @@ class BaseLogicHandler(_BaseLogicHandler):
     def __init__(self, config):
         self.config = config
 
-        self.shm_mgr = NodeContext.shm_mgr
-        self.core = NodeContext.core
+        self.shm_mgr = SharedMemoryManager(self.config)
 
     def handle_data(self, pkt):
         pass

@@ -10,9 +10,6 @@ class NodeContext():
     Simply, we can just store the context info in the class' attributes.
     '''
 
-    # The shared memory manager instance
-    shm_mgr = None
-
     # The core instance
     core = None
 

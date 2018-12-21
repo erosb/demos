@@ -56,17 +56,12 @@ class ControllerLogicHandler(BaseLogicHandler):
         '''
 
         self.shm_mgr.connect(
-            self.SHM_SOCKET_NAME_TEMPLATE % self.NodeContext.pid
+            self.SHM_SOCKET_NAME_TEMPLATE % NodeContext.pid
         )
         self.shm_mgr.create_key(
             self.SHM_KEY_CLUSTER_NODES,
             SHMContainerTypes.DICT,
         )
-
-    def __raise_shm_error(self, shm_resp):
-        msg = f'SharedMemoryError occurred, SHM response: {shm_resp}'
-        logger.error(msg)
-        raise SharedMemoryError(msg)
 
     def _gen_resp_pkt(self, content, dest):
         src = (NodeContext.local_ip, NodeContext.core.main_afferent.listen_port)
@@ -111,28 +106,19 @@ class ControllerLogicHandler(BaseLogicHandler):
                 'role': role,
             }
         }
-        resp = self.shm_mgr.add_value(
-                   self.SHM_KEY_CLUSTER_NODES,
-                   node_value,
-               )
-
-        succeeded = resp.get('succeeded')
-        if not succeeded:
-            self.__raise_shm_error(resp)
+        self.shm_mgr.add_value(
+            self.SHM_KEY_CLUSTER_NODES,
+            node_value,
+        )
 
     def remove_cluster_node(self, identification):
-        resp = self.shm_mgr.remove_value(
-                   self.SHM_KEY_CLUSTER_NODES,
-                   identification,
-               )
+        self.shm_mgr.remove_value(
+            self.SHM_KEY_CLUSTER_NODES,
+            identification,
+        )
 
     def get_cluster_nodes(self):
         resp = self.shm_mgr.read_key(self.SHM_KEY_CLUSTER_NODES)
-
-        succeeded = resp.get('succeeded')
-        if not succeeded:
-            self.__raise_shm_error(resp)
-
         return resp.get('value')
 
     def get_relay_nodes(self):

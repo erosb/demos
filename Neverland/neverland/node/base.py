@@ -72,17 +72,26 @@ class BaseNode():
         self.shm_worker_pid = None
 
     def _handle_term_master(self, signal, sf):
+        logger.debug(f'Master process received signal: {signal}')
+        logger.debug(f'Start to shut down workers')
         self.shutdown_workers()
 
         pid_path = self.config.pid_file
         if os.path.isfile(pid_path):
+            logger.debug(f'Remove pid file: {pid_path}')
             os.remove(pid_path)
         sys.exit(0)
 
     def _handle_term_worker(self, signal, sf):
+        pid = os.getpid()
+        logger.debug(f'Worker {pid} received signal: {signal}')
+        logger.debug(f'Shutting down worker {pid}')
         self.core.shutdown()
 
     def _handle_term_shm(self, signal, sf):
+        pid = os.getpid()
+        logger.debug(f'SharedMemoryManager {pid} received signal: {signal}')
+        logger.debug(f'Shutting down SharedMemoryManager {pid}')
         self.shm_mgr.shutdown_worker()
 
     def _sig_master(self):
@@ -105,25 +114,29 @@ class BaseNode():
             self._kill(pid)
 
         # wait for workers to exit
-        remaining = self.worker_pids
+        remaining = list(self.worker_pids)
         while True:
             for pid in list(remaining):
                 if _process_exists(pid):
                     os.waitpid(pid, os.WNOHANG)
                 else:
+                    logger.debug(f'Worker {pid} terminated')
                     remaining.remove(pid)
 
             if len(remaining) == 0:
                 break
 
-            time.sleep(0.1)
+            time.sleep(0.5)
 
         # shutdown SharedMemoryManager worker at last
         self._kill(self.shm_worker_pid)
         os.waitpid(self.shm_worker_pid, 0)
+        logger.debug(f'SharedMemoryManager worker {pid} terminated')
+        logger.debug('All workers terminated')
 
     def _kill(self, pid):
         try:
+            logger.debug(f'Sending SIGTERM to {pid}')
             os.kill(pid, sig.SIGTERM)
         except ProcessLookupError:
             pass
@@ -132,8 +145,10 @@ class BaseNode():
         try:
             os.kill(pid, 0)
         except OSError:
+            logger.debug(f'Process {pid} not exists')
             return False
         else:
+            logger.debug(f'Process {pid} exists')
             return True
 
     def daemonize(self):
@@ -161,14 +176,17 @@ class BaseNode():
             os.kill(ppid, sig.SIGTERM)
             os.setsid()
 
+        logger.debug('Node daemonized')
+
     def get_context():
         return NodeContext
 
     def _create_context(self):
-        NodeContext.shm_mgr = self.shm_mgr
         NodeContext.core = self.core
         NodeContext.pid = os.getpid()
         NodeContext.local_ip = get_localhost_ip()
+
+        logger.debug('Node context created')
 
     def _load_modules(self):
         self.shm_mgr = SharedMemoryManager(self.config)
@@ -199,7 +217,9 @@ class BaseNode():
                         protocol_wrapper=self.protocol_wrapper,
                     )
 
-    def _init_modules(self):
+        logger.debug('Node modules loaded')
+
+    def _prepare_modules(self):
         ''' an additional init step for part of modules
         '''
 
@@ -207,6 +227,8 @@ class BaseNode():
 
         self.core.init_shm()
         self.core.self_allocate_core_id()
+
+        logger.debug('Additional init step for node modules done')
 
     def run(self):
         self.daemonize()
@@ -221,6 +243,7 @@ class BaseNode():
             return  # the sub-process ends here
         else:
             self.shm_worker_pid = pid
+            logger.info(f'Started SharedMemoryManager: {pid}')
 
         # start normal workers
         worker_amount = self.config.worker_amount
@@ -233,11 +256,12 @@ class BaseNode():
                 self._sig_normal_worker()
                 self._load_modules()
                 self._create_context()
-                self._init_modules()
+                self._prepare_modules()
                 self.core.run()
                 return  # the sub-process ends here
             else:
                 self.worker_pids.append(pid)
+                logger.info(f'Started Worker: {pid}')
 
         os.waitpid(-1, 0)
         logger.info('Node exits.')

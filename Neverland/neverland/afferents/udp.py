@@ -17,11 +17,13 @@ class UDPReceiver():
 
     def __init__(self, config, listen_addr=None, listen_port=None):
         self.config = config
-        self._sock = self.create_socket()
-        self._fd = self._sock.fileno()
 
         self.listen_addr = listen_addr or self.config.listen_addr
         self.listen_port = listen_port or self.config.listen_port
+
+        self._sock = self.create_socket()
+        self.setsockopt(self._sock)
+        self._fd = self._sock.fileno()
 
     def create_socket(self):
         af, type_, proto, canon, sa = socket.getaddrinfo(
@@ -32,15 +34,17 @@ class UDPReceiver():
 
         sock = socket.socket(af, type_, proto)
         sock.setblocking(False)
-        sock.bind(
-            (self.listen_addr, self.listen_port)
-        )
         return sock
 
     def setsockopt(self, sock):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         return sock
+
+    def listen(self):
+        self._sock.bind(
+            (self.listen_addr, self.listen_port)
+        )
 
     def distory(self):
         self._sock.close()

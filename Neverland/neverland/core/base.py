@@ -12,7 +12,10 @@ from neverland.utils import ObjectifiedDict, get_localhost_ip
 from neverland.exceptions import DropPakcet, ConfigError
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.core.status import ClusterControllingStatus
-from neverland.components.sharedmem import SHMContainerTypes
+from neverland.components.sharedmem import (
+    SHMContainerTypes,
+    SharedMemoryManager,
+)
 
 
 logger = logging.getLogger('Main')
@@ -45,6 +48,10 @@ class BaseCore():
     #     [1, 2, 3, 4]
     SHM_KEY_CORE_ID = 'Core_id'
 
+    # The shared status of cluster controlling,
+    # enumerated in neverland.core.status.ClusterCtrlStatus
+    SHM_KEY_CTRL_STATUS = 'Core_CtrlStatus'
+
     def __init__(
         self, config, efferent, logic_handler,
         protocol_wrapper, main_afferent, minor_afferents=tuple(),
@@ -64,31 +71,41 @@ class BaseCore():
         self._epoll = select.epoll()
         self.afferent_mapping = {}
 
-        self.shm_mgr = NodeContext.shm_mgr
-
         self.config = config
         self.main_afferent = main_afferent
         self.efferent = efferent
         self.logic_handler = logic_handler
         self.protocol_wrapper = protocol_wrapper
 
+        self.shm_mgr = SharedMemoryManager(self.config)
+
         self.plug_afferent(self.main_afferent)
 
         for afferent in minor_afferents:
             self.plug_afferent(afferent)
 
-        # status of cluster controlling
-        # enumerated in neverland.core.status.ClusterCtrlStatus
-        self._ctrl_status = ClusterControllingStatus.INIT
+    def _set_ctrl_status(self, status):
+        self.shm_mgr.set_value(self.SHM_KEY_CTRL_STATUS, status)
+
+    def _get_ctrl_status(self):
+        resp = self.shm_mgr.read_key(self.SHM_KEY_CTRL_STATUS)
+        return resp.get('value')
 
     def init_shm(self):
         self.shm_mgr.connect(
-            self.SHM_SOCKET_NAME_TEMPLATE % self.NodeContext.pid
+            self.SHM_SOCKET_NAME_TEMPLATE % NodeContext.pid
         )
         self.shm_mgr.create_key(
             self.SHM_KEY_CORE_ID,
             SHMContainerTypes.LIST,
         )
+        self.shm_mgr.create_key(
+            self.SHM_KEY_CTRL_STATUS,
+            SHMContainerTypes.INT,
+            ClusterControllingStatus.INIT,
+        )
+
+        logger.debug(f'init_shm for core of worker {NodeContext.pid} has done')
 
     def self_allocate_core_id(self):
         ''' Let the core pick up an id for itself
@@ -107,6 +124,10 @@ class BaseCore():
             [id_],
         )
         self.core_id = id_
+
+        logger.debug(
+            f'core of worker {NodeContext.pid} has self-allocated id: {id_}'
+        )
 
     def plug_afferent(self, afferent):
         self._epoll.register(afferent.fd, self.EV_MASK)
@@ -138,6 +159,8 @@ class BaseCore():
         if identification is None:
             raise ConfigError("identification is not defined")
 
+        logger.info('Trying to join cluster...')
+
         local_ip = get_localhost_ip()
         port = self.main_afferent.listen_port
         src = (local_ip, port)
@@ -158,7 +181,7 @@ class BaseCore():
         pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)
 
-        self._ctrl_status = ClusterControllingStatus.WAITING_FOR_JOIN
+        self._set_ctrl_status(ClusterControllingStatus.WAITING_FOR_JOIN)
 
     def leave_cluster(self):
         ''' here defines how the nodes detach from the neverland cluster
@@ -171,6 +194,8 @@ class BaseCore():
             raise ConfigError("cluster_entrance is not defined")
         if identification is None:
             raise ConfigError("identification is not defined")
+
+        logger.info('Trying to leave cluster...')
 
         local_ip = get_localhost_ip()
         port = self.main_afferent.listen_port
@@ -192,7 +217,7 @@ class BaseCore():
         pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)
 
-        self._ctrl_status = ClusterControllingStatus.WAITING_FOR_LEAVE
+        self._set_ctrl_status(ClusterControllingStatus.WAITING_FOR_LEAVE)
 
     def handle_pkt(self, pkt):
         pkt = self.protocol_wrapper.unwrap(pkt)
