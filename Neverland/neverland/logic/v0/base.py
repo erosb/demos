@@ -32,11 +32,7 @@ class BaseLogicHandler(_BaseLogicHandler):
         pass
 
     def handle_ctrl_response(self, pkt):
-        return self.handle_base_ctrl_responses(pkt)
-
-    def handle_base_ctrl_responses(self, pkt):
-        ''' handles common cluster controlling responses
-        '''
+        pass
 
     def handle_conn_ctrl(self, pkt):
         pass

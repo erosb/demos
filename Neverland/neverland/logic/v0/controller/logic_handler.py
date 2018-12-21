@@ -22,9 +22,9 @@ ROLE_NAMES = Roles._keys()
 
 class ControllerLogicHandler(BaseLogicHandler):
 
-    SHM_SOCKET_NAME_TEMPLATE = 'SHM-Controller-%d.socket'
+    SHM_SOCKET_NAME_TEMPLATE = 'SHM-CtrlLogic-%d.socket'
 
-    # SHM container of all nodes added into the cluster
+    # SHM container for containing all nodes added into the cluster
     # data structure:
     #     {
     #         identification: {
@@ -33,7 +33,7 @@ class ControllerLogicHandler(BaseLogicHandler):
     #             'role': neverland.node.Roles.*,
     #         }
     #     }
-    SHM_KEY_CLUSTER_NODES = 'CLUSTER_NODES'
+    SHM_KEY_CLUSTER_NODES = 'CtrlLogic_ClusterNodes'
 
     def __init__(self, *args, **kwargs):
         BaseLogicHandler.__init__(self, *args, **kwargs)
@@ -55,8 +55,13 @@ class ControllerLogicHandler(BaseLogicHandler):
         ''' initialize the shared memory
         '''
 
-        self.shm_mgr.connect(self.SHM_SOCKET_NAME % self.NodeContext.pid)
-        self.shm_mgr.create_key(SHM_KEY_CLUSTER_NODES, SHMContainerTypes.DICT)
+        self.shm_mgr.connect(
+            self.SHM_SOCKET_NAME_TEMPLATE % self.NodeContext.pid
+        )
+        self.shm_mgr.create_key(
+            self.SHM_KEY_CLUSTER_NODES,
+            SHMContainerTypes.DICT,
+        )
 
     def __raise_shm_error(self, shm_resp):
         msg = f'SharedMemoryError occurred, SHM response: {shm_resp}'
