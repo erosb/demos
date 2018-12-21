@@ -46,6 +46,23 @@ class ClusterControllingSubjects(metaclass=MetaEnum):
     #                }
     READ_CLUSTER_CONFIG = 0x11
 
+    # This one means the current packet contains some information about
+    # cluster status.
+    #
+    # Only the controller node can use this subject in distributing
+    # cluster status in the cluster, other nodes should not accept
+    # this subject if it's not from the controller node.
+    #
+    # Required content: {
+    #                       ""
+    #                   }
+    #
+    # Response body: {
+    #                    "identification": str,
+    #                    "confirmed": bool
+    #                }
+    CLUSTER_STATUS_PUSHING = 0xe1
+
     # This one means the current packet is a response for a received request
     #
     # Required content: {
