@@ -1,7 +1,7 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-
+from neverland.node import Roles
 from neverland.node.base import BaseNode
 
 
@@ -35,3 +35,5 @@ class OutletNode(BaseNode):
         port and enable the SO_REUSEPORT option so that the kernel can do
         load balancing for them.
     '''
+
+    role = Roles.OUTLET

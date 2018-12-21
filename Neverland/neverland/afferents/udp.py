@@ -92,7 +92,7 @@ class ClientUDPReceiver(UDPReceiver):
 
         pkt = UDPPacket(
                   data=data,
-                  src={'addr': src[0], 'port': src[1]}
-                  dest={'addr': dest_addr, 'port': dest_port}
+                  src={'addr': src[0], 'port': src[1]},
+                  dest={'addr': dest_addr, 'port': dest_port},
               )
         return pkt

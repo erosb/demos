@@ -1,7 +1,7 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-
+from neverland.node import Roles
 from neverland.node.base import BaseNode
 
 
@@ -18,3 +18,5 @@ class ClientNode(BaseNode):
 
         single-main-process
     '''
+
+    role = Roles.CLIENT

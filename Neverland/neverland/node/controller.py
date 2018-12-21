@@ -1,7 +1,7 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-
+from neverland.node import Roles
 from neverland.node.base import BaseNode
 
 
@@ -44,3 +44,5 @@ class ControllerNode(BaseNode):
         In this model, all logic will be implemented in the master.
         All work will be done in the master process.
     '''
+
+    role = Roles.CONTROLLER

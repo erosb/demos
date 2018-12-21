@@ -16,10 +16,10 @@ from neverland.core.outlet import OutletCore
 from neverland.core.controller import ControllerCore
 from neverland.afferents.udp import UDPReceiver, ClientUDPReceiver
 from neverland.efferents.udp import UDPTransmitter
-from neverland.logic.client.v0 import ClientLogicHandler
-from neverland.logic.controller.v0 import ControllerLogicHandler
-from neverland.logic.outlet.v0 import OutletLogicHandler
-from neverland.logic.relay.v0 import RelayLogicHandler
+from neverland.logic.v0.client.logic_handler import ClientLogicHandler
+from neverland.logic.v0.controller.logic_handler import ControllerLogicHandler
+from neverland.logic.v0.outlet.logic_handler import OutletLogicHandler
+from neverland.logic.v0.relay.logic_handler import RelayLogicHandler
 from neverland.protocol.v0 import ProtocolWrapper
 from neverland.protocol.v0.fmt import (
     HeaderFormat,
@@ -63,9 +63,11 @@ class BaseNode():
     ''' The Base Class of Nodes
     '''
 
-    def __init__(self, config, role):
+    role = None
+
+    def __init__(self, config, role=None):
         self.config = config
-        self.role = role
+        self.role = role or self.role
         self.worker_pids = []
         self.shm_worker_pid = None
 

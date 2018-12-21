@@ -4,14 +4,18 @@
 import json
 
 from neverland.utils import ObjectifiedDict
+from neverland.exceptions import ConfigError
 
 
 class ConfigLoader():
 
     @classmethod
     def load_json_file(cls, path):
-        with open(path, 'r') as f:
-            content = f.read()
+        try:
+            with open(path, 'r') as f:
+                content = f.read()
+        except FileNotFoundError:
+            raise ConfigError(f'Config file not found: {path}')
 
         content = json.loads(content)
         config = JsonConfig(**content)
