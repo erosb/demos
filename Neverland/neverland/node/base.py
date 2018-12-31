@@ -71,6 +71,17 @@ class BaseNode():
         self.worker_pids = []
         self.shm_worker_pid = None
 
+    def _write_master_pid(self):
+        pid_path = self.config.pid_file
+        pid = os.getpid()
+
+        with open(pid_path, 'w') as f:
+            f.write(str(pid))
+
+        logger.debug(
+            f'wrote pid file {pid_path} for master process, pid: {pid}'
+        )
+
     def _handle_term_master(self, signal, sf):
         logger.debug(f'Master process received signal: {signal}')
         logger.debug(f'Start to shut down workers')
@@ -117,7 +128,7 @@ class BaseNode():
         remaining = list(self.worker_pids)
         while True:
             for pid in list(remaining):
-                if _process_exists(pid):
+                if self._process_exists(pid):
                     os.waitpid(pid, os.WNOHANG)
                 else:
                     logger.debug(f'Worker {pid} terminated')
@@ -188,16 +199,20 @@ class BaseNode():
 
         logger.debug('Node context created')
 
-    def _load_modules(self):
+    def _load_shm_mgr(self):
         self.shm_mgr = SharedMemoryManager(self.config)
+        logger.debug('SharedMemoryManager loaded')
+
+    def _load_modules(self):
+        self._load_shm_mgr()
 
         self.afferent_cls = AFFERENT_MAPPING[self.role]
-        self.main_afferent = afferent_cls(self.config)
+        self.main_afferent = self.afferent_cls(self.config)
 
-        self.efferent = UDPTransmitter(config)
+        self.efferent = UDPTransmitter(self.config)
 
         self.protocol_wrapper = ProtocolWrapper(
-                                    config,
+                                    self.config,
                                     HeaderFormat,
                                     DataPktFormat,
                                     CtrlPktFormat,
@@ -208,7 +223,7 @@ class BaseNode():
         self.logic_handler = self.logic_handler_cls(self.config)
 
         self.core_cls = CORE_MAPPING.get(self.role)
-        self.core = core_cls(
+        self.core = self.core_cls(
                         self.config,
                         main_afferent=self.main_afferent,
                         minor_afferents=[],
@@ -232,6 +247,7 @@ class BaseNode():
 
     def run(self):
         self.daemonize()
+        self._write_master_pid()
 
         # start SharedMemoryManager worker
         pid = os.fork()
@@ -239,6 +255,7 @@ class BaseNode():
             raise OSError('fork failed')
         elif pid == 0:
             self._sig_shm_worker()
+            self._load_shm_mgr()
             self.shm_mgr.run_as_worker()
             return  # the sub-process ends here
         else:

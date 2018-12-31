@@ -1,26 +1,30 @@
 {
 	"identification": "controller",
 
-	"listen_addr": "0.0.0.0",
-	"listen_port": 17151,
+	"aff_listen_addr": "0.0.0.0",
+	"aff_listen_port": 17151,
 	"ipv6": false,
 
-	"worker_amount": 2,
+	"worker_amount": 1,
 
 	"salt_len": 8,
 	"crypto_lib_path": "/usr/local/lib/libcrypto.so.1.1",
 
-	"shm_socket_dir": "/var/run/ic_shm",
+	"pid_file": "/tmp/nl_master.pid",
+
+	"shm_socket_dir": "/tmp/nl_shm",
 	"shm_manager_socket_name": "manager",
 
-	"log_level": "info",
-	"shm_log_path": "/var/log/ic_shm.log",
-	"main_log_path": "/var/log/ic.log",
+	"log": {
+		"level": "debug",
+		"path_shm": "/tmp/nl-log/shm.log",
+		"path_main": "/tmp/nl-log/nl.log"
+	},
 
 	"cluster_nodes": {
 		"relay-0000": {
 			"ip": "192.168.122.23",
-			"role": "relay"
+			"role": "RELAY"
 		}
 	}
 }

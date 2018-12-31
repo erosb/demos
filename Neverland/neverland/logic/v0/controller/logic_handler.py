@@ -38,14 +38,24 @@ class ControllerLogicHandler(BaseLogicHandler):
     def __init__(self, *args, **kwargs):
         BaseLogicHandler.__init__(self, *args, **kwargs)
 
-        self.identification = self.config.get('identification')
-        self.configured_cluster_nodes = self.config.get('cluster_nodes')
+        self.identification = self.config.identification
+        self.configured_cluster_nodes = self.config.cluster_nodes
 
         self._verify_config()
 
     def _verify_config(self):
-        for identification, definition in self.configured_cluster_nodes.items():
-            role_name = definition.get('role')
+        if self.configured_cluster_nodes is None:
+            raise ConfigError('cluster_nodes is not configured')
+
+        for identification, definition in self.configured_cluster_nodes:
+            role_name = definition.role
+            ip = definition.ip
+
+            if role_name is None or ip is None:
+                raise ConfigError(
+                    f'cluster_nodes has been configured in a wrong format'
+                )
+
             if role_name not in ROLE_NAMES:
                 raise ConfigError(
                     f'Invalid role name in cluster_nodes: {role_name}'

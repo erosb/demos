@@ -28,7 +28,7 @@ class UDPTransmitter():
                                           host='0.0.0.0',
                                           port=0,
                                           proto=socket.SOL_UDP,
-                                      )
+                                      )[0]
 
         sock = socket.socket(af, type_, proto)
         sock.setblocking(False)

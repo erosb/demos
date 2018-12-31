@@ -18,6 +18,8 @@ from neverland.components.sharedmem import (
 )
 
 
+POLL_TIMEOUT = 4
+
 logger = logging.getLogger('Main')
 
 
@@ -111,7 +113,8 @@ class BaseCore():
         ''' Let the core pick up an id for itself
         '''
 
-        allocated_id = self.shm_mgr.read_key(self.SHM_KEY_CORE_ID)
+        resp = self.shm_mgr.read_key(self.SHM_KEY_CORE_ID)
+        allocated_id = resp.get('value')
 
         if len(allocated_id) == 0:
             id_ = 0

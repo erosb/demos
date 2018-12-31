@@ -4,6 +4,7 @@
 import sys
 import argparse
 
+from neverland.logging import init_all_loggers
 from neverland.exceptions import ArgumentError
 from neverland.config import ConfigLoader
 from neverland.node import Roles
@@ -35,7 +36,6 @@ ROLE_NODE_CLS_MAPPING = {
 }
 
 
-
 def parse_cli_args():
     argp = argparse.ArgumentParser(
                prog='Neverland',
@@ -60,8 +60,11 @@ def launch():
     args = parse_cli_args()
 
     config_path = args.c
-    node_role_name = args.r
+    config = ConfigLoader.load_json_file(config_path)
 
+    init_all_loggers(config)
+
+    node_role_name = args.r
     node_role = (
         STANDARD_ROLE_NAME_MAPPING.get(node_role_name) or
         CODE_STYLE_ROLE_NAME_MAPPING.get(node_role_name)
@@ -71,10 +74,8 @@ def launch():
 
     node_cls = ROLE_NODE_CLS_MAPPING.get(node_role)
 
-    config = ConfigLoader.load_json_file(config_path)
-
     node = node_cls(config)
-    # node.run()
+    node.run()
 
 
 if __name__ == '__main__':
