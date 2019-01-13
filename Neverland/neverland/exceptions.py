@@ -32,6 +32,14 @@ class DropPakcet(Exception):
     '''
 
 
+class FailedToJoinCluster(Exception):
+    pass
+
+
+class FailedToDetachFromCluster(Exception):
+    pass
+
+
 class SharedMemoryError(Exception):
     pass
 

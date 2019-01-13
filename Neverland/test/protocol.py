@@ -15,9 +15,15 @@ from neverland.protocol.v0.fmt import (
 )
 
 
-config = ObjectifiedDict()
-config.salt_len = 8
-config.ipv6 = False
+json_config = {
+    'net': {
+        'ipv6': False,
+        'crypto': {
+            'salt_len': 8
+        }
+    }
+}
+config = ObjectifiedDict(**json_config)
 
 base_wrapper = ProtocolWrapper(
                    config,

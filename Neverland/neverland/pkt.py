@@ -41,14 +41,8 @@ class UDPPacket(ObjectifiedDict):
             data: bytes,
             fields: ObjectifiedDict,
             byte_fields: ObjectifiedDict,
-            previous_hop: {
-                addr: str,
-                port: int,
-            },
-            next_hop: {
-                addr: str,
-                port: int,
-            },
+            previous_hop: (ip, port)
+            next_hop: (ip, port),
         }
 
     By default, the "valid" field is None. It should be set
@@ -65,7 +59,7 @@ class UDPPacket(ObjectifiedDict):
         for kw in ['previous_hop', 'next_hop']:
             if kw not in kwargs:
                 kwargs.update(
-                    {kw: {'addr': None, 'port': None}}
+                    {kw: (None, None)}
                 )
 
         for kw in ['fields', 'byte_fields']:

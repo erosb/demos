@@ -4,9 +4,14 @@
 import os
 import sys
 import time
+import select
 import signal as sig
 import logging
 
+from neverland.excetions import (
+    FailedToJoinCluster,
+    FailedToDetachFromCluster,
+)
 from neverland.utils import get_localhost_ip
 from neverland.node import Roles
 from neverland.node.context import NodeContext
@@ -30,7 +35,7 @@ from neverland.protocol.v0.fmt import (
 from neverland.components.sharedmem import SharedMemoryManager
 
 
-logger = logging.getLogger('Main')
+logger = logging.getLogger('Node')
 
 
 AFFERENT_MAPPING = {
@@ -245,6 +250,41 @@ class BaseNode():
 
         logger.debug('Additional init step for node modules done')
 
+    def join_cluster(self):
+        epoll = select.epoll()
+        epoll.register(self.main_afferent.fd, select.EPOLLIN)
+
+        self.core.request_to_join_cluster()
+
+        max_poll_times = 4
+        polled_time = 0
+
+        while polled_time < max_poll_times:
+            polled_time += 1
+
+            events = epoll.poll(8)
+            for fd, evt in events:
+                if evt & select.EPOLLERR:
+                    pass
+                elif evt & select.EPOLLIN:
+                    pkt = afferent.recv()
+
+                    p_hop_ip = pkt.previous_hop[0]
+                    if p_hop_ip != self.config.cluster_entrance.ip:
+                        logger.warn(
+                            f'Unexpected packet source of cluster joining '
+                            f'response: {p_hop_ip}'
+                        )
+                        continue
+
+                    self.protocol_wrapper.unwrap(pkt)
+                    if not pkt.valid:
+                        continue
+
+                    # TODO to be continued...
+
+        raise FailedToJoinCluster
+
     def run(self):
         self.daemonize()
         self._write_master_pid()
@@ -261,6 +301,10 @@ class BaseNode():
         else:
             self.shm_worker_pid = pid
             logger.info(f'Started SharedMemoryManager: {pid}')
+
+        # Before we start workers, we need to join the cluster first.
+        if self.role != Roles.CONTROLLER:
+            self.join_cluster()
 
         # start normal workers
         worker_amount = self.config.basic.worker_amount

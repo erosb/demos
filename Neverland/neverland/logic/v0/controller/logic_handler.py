@@ -16,7 +16,7 @@ from neverland.exceptions import (
 )
 
 
-logger = logging.getLogger('Main')
+logger = logging.getLogger('Logic')
 ROLE_NAMES = Roles._keys()
 
 
@@ -94,10 +94,7 @@ class ControllerLogicHandler(BaseLogicHandler):
             resp_pkt.next_hop = dest
         else:
             relay = relay_nodes[0]
-            resp_pkt.next_hop = {
-                'ip': relay.get('ip'),
-                'port': relay.get('port'),
-            }
+            resp_pkt.next_hop = (relay.get('ip'), relay.get('port'))
 
         return resp_pkt
 

@@ -10,9 +10,18 @@ from neverland.exceptions import ConfigError
 
 # mapping names of loggers and the keyword of their config
 LOGGER_NAME_CONFIG_KW_MAPPING = {
-    'Main': 'main',
     'SHM': 'shm',
 }
+
+MAIN_LOGGER_CONFIG_KW = 'main'
+MAIN_LOG_LOGGERS = [
+    'Main',
+    'Node',
+    'Core',
+    'Afferent',
+    'Efferent',
+    'Logic',
+]
 
 
 main_logger = logging.getLogger('Main')
@@ -26,6 +35,16 @@ def init_all_loggers(config):
         'warn': logging.WARN,
         'error': logging.ERROR,
     }
+
+    for logger_name in MAIN_LOG_LOGGERS:
+        logger = logging.getLogger(logger_name)
+        logger_conf = getattr(config.log, MAIN_LOGGER_CONFIG_KW)
+
+        level = lv_map.get(logger_conf.level) or logging.INFO
+        paht = logger_conf.path
+        stdout_enabled = logger_conf.stdout
+
+        init_logger(logger, level, path, stdout_enabled)
 
     for logger_name, conf_kw in LOGGER_NAME_CONFIG_KW_MAPPING.items():
         logger = logging.getLogger(logger_name)

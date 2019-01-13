@@ -47,5 +47,5 @@ class UDPTransmitter():
 
         self._sock.sendto(
             pkt.data,
-            (pkt.next_hop.addr, pkt.next_hop.port)
+            pkt.next_hop,
         )

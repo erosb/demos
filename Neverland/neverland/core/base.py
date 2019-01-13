@@ -20,7 +20,7 @@ from neverland.components.sharedmem import (
 
 POLL_TIMEOUT = 4
 
-logger = logging.getLogger('Main')
+logger = logging.getLogger('Core')
 
 
 class BaseCore():
@@ -68,6 +68,8 @@ class BaseCore():
         :param minor_afferents: a group of minor afferents,
                                 any iterable type contains afferent instances
         '''
+
+        self.__running = False
 
         self.core_id = None
         self._epoll = select.epoll()
@@ -150,8 +152,8 @@ class BaseCore():
         self._epoll.unregister(fd)
         self.afferent_mapping.pop(fd)
 
-    def join_cluster(self):
-        ''' here defines how the node join the neverland cluster
+    def request_to_join_cluster(self):
+        ''' send a request of the node is going to join the cluster
         '''
 
         entrance = self.config.cluster_entrance
@@ -179,7 +181,7 @@ class BaseCore():
                          subject=subject,
                          content=content,
                      )
-        pkt.next_hop = entrance
+        pkt.next_hop = (entrance.ip, entrance.port)
 
         pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)
@@ -191,8 +193,8 @@ class BaseCore():
         logger.info('[Node Status] WAITING_FOR_JOIN')
         self._set_ctrl_status(ClusterControllingStatus.WAITING_FOR_JOIN)
 
-    def leave_cluster(self):
-        ''' here defines how the node detach from the neverland cluster
+    def request_to_leave_cluster(self):
+        ''' send a request of the node is going to detach from the cluster
         '''
 
         entrance = self.config.cluster_entrance
@@ -220,7 +222,7 @@ class BaseCore():
                          subject=subject,
                          content=content,
                      )
-        pkt.next_hop = entrance
+        pkt.next_hop = (entrance.ip, entrance.port)
 
         pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)

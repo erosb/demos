@@ -12,16 +12,19 @@ from neverland.utils import ObjectifiedDict
 from neverland.components.sharedmem import SharedMemoryManager, SHMContainerTypes
 
 
-config = ObjectifiedDict(
-             shm_socket_dir='/tmp/nl_shm_sock/',
-             shm_manager_socket_name='manager',
-         )
+json_config = {
+    'shm': {
+        'socket_dir': '/tmp/nl_shm_sock/',
+        'manager_socket_name': 'manager',
+    }
+}
+config = ObjectifiedDict(**json_config)
 
 
 # clean the socket directory
-if os.path.isdir(config.shm_socket_dir):
-    shutil.rmtree(config.shm_socket_dir)
-os.mkdir(config.shm_socket_dir)
+if os.path.isdir(config.shm.socket_dir):
+    shutil.rmtree(config.shm.socket_dir)
+os.mkdir(config.shm.socket_dir)
 
 
 KEY = 'k0'

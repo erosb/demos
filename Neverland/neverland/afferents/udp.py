@@ -54,7 +54,7 @@ class UDPReceiver():
         data, src = self._sock.recvfrom(UDP_BUFFER_SIZE)
         pkt = UDPPacket(
                   data=data,
-                  previous_hop={'addr': src[0], 'port': src[1]}
+                  previous_hop=src,
               )
         return pkt
 
