@@ -8,4 +8,3 @@ class OutletLogicHandler(BaseLogicHandler):
 
     def __init__(self, *args, **kwargs):
         BaseLogicHandler.__init__(self, *args, **kwargs)
-        self.identification = self.config.get('identification')

@@ -38,7 +38,7 @@ class ControllerLogicHandler(BaseLogicHandler):
     def __init__(self, *args, **kwargs):
         BaseLogicHandler.__init__(self, *args, **kwargs)
 
-        self.identification = self.config.identification
+        self.identification = self.config.net.identification
         self.configured_cluster_nodes = self.config.cluster_nodes
 
         self._verify_config()

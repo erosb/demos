@@ -18,8 +18,8 @@ class UDPReceiver():
     def __init__(self, config, listen_addr=None, listen_port=None):
         self.config = config
 
-        self.listen_addr = listen_addr or self.config.aff_listen_addr
-        self.listen_port = listen_port or self.config.aff_listen_port
+        self.listen_addr = listen_addr or self.config.net.aff_listen_addr
+        self.listen_port = listen_port or self.config.net.aff_listen_port
 
         self._sock = self.create_socket()
         self.setsockopt(self._sock)

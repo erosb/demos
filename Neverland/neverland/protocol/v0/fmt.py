@@ -85,14 +85,14 @@ class HeaderFormat(BasePktFormat):
             # The source of the packet
             # TODO ipv6 support
             'src': FieldDefinition(
-                       length = None if config.ipv6 else 6,
+                       length = None if config.net.ipv6 else 6,
                        type   = FieldTypes.STRUCT_IPV4_SA,
                    ),
 
             # The destination of the packet
             # TODO ipv6 support
             'dest': FieldDefinition(
-                        length = None if config.ipv6 else 6,
+                        length = None if config.net.ipv6 else 6,
                         type   = FieldTypes.STRUCT_IPV4_SA,
                     ),
         }

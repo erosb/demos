@@ -1,21 +1,39 @@
 {
-	"identification": "relay-0000",
+	"basic": {
+		"worker_amount": 2,
+		"pid_file": "/tmp/nl_master.pid"
+	},
 
-	"listen_addr": "0.0.0.0",
-	"listen_port": 17151,
-	"ipv6": false,
+	"net": {
+		"identification": "relay-0000",
 
-	"worker_amount": 2,
+		"aff_listen_addr": "0.0.0.0",
+		"aff_listen_port": 17151,
+		"ipv6": false,
 
-	"salt_len": 8,
-	"crypto_lib_path": "/usr/local/lib/libcrypto.so.1.1",
+		"crypto": {
+			"salt_len": 8,
+			"crypto_lib_path": "/usr/local/lib/libcrypto.so.1.1"
+		}
+	},
 
-	"shm_socket_dir": "/var/run/ic_shm",
-	"shm_manager_socket_name": "manager",
+	"shm": {
+		"socket_dir": "/tmp/nl_shm",
+		"manager_socket_name": "manager"
+	},
 
-	"log_level": "info",
-	"shm_log_path": "/var/log/ic_shm.log",
-	"main_log_path": "/var/log/ic.log",
+	"log": {
+		"main": {
+			"level": "debug",
+			"path": "/tmp/nl-log/nl.log",
+			"stdout": true
+		},
+		"shm": {
+			"level": "debug",
+			"path": "/tmp/nl-log/shm.log",
+			"stdout": true
+		}
+	},
 
 	"cluster_entrance": {
 		"ip": "192.168.122.22",

@@ -151,11 +151,11 @@ class BaseCore():
         self.afferent_mapping.pop(fd)
 
     def join_cluster(self):
-        ''' here defines how the nodes join the neverland cluster
+        ''' here defines how the node join the neverland cluster
         '''
 
         entrance = self.config.cluster_entrance
-        identification = self.config.identification
+        identification = self.config.net.identification
 
         if entrance is None:
             raise ConfigError("cluster_entrance is not defined")
@@ -184,14 +184,19 @@ class BaseCore():
         pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)
 
+        logger.info(
+            f'Sent request to cluster entrance {entrance.ip}:{entrance.port}'
+        )
+
+        logger.info('[Node Status] WAITING_FOR_JOIN')
         self._set_ctrl_status(ClusterControllingStatus.WAITING_FOR_JOIN)
 
     def leave_cluster(self):
-        ''' here defines how the nodes detach from the neverland cluster
+        ''' here defines how the node detach from the neverland cluster
         '''
 
         entrance = self.config.cluster_entrance
-        identification = self.config.identification
+        identification = self.config.net.identification
 
         if entrance is None:
             raise ConfigError("cluster_entrance is not defined")
@@ -220,6 +225,11 @@ class BaseCore():
         pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)
 
+        logger.info(
+            f'Sent request to cluster entrance {entrance.ip}:{entrance.port}'
+        )
+
+        logger.info('[Node Status] WAITING_FOR_LEAVE')
         self._set_ctrl_status(ClusterControllingStatus.WAITING_FOR_LEAVE)
 
     def handle_pkt(self, pkt):

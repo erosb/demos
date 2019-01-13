@@ -1,24 +1,38 @@
 {
-	"identification": "controller",
+	"basic": {
+		"worker_amount": 2,
+		"pid_file": "/tmp/nl_master.pid"
+	},
 
-	"aff_listen_addr": "0.0.0.0",
-	"aff_listen_port": 17151,
-	"ipv6": false,
+	"net": {
+		"identification": "controller",
 
-	"worker_amount": 1,
+		"aff_listen_addr": "0.0.0.0",
+		"aff_listen_port": 17151,
+		"ipv6": false,
 
-	"salt_len": 8,
-	"crypto_lib_path": "/usr/local/lib/libcrypto.so.1.1",
+		"crypto": {
+			"salt_len": 8,
+			"crypto_lib_path": "/usr/local/lib/libcrypto.so.1.1"
+		}
+	},
 
-	"pid_file": "/tmp/nl_master.pid",
-
-	"shm_socket_dir": "/tmp/nl_shm",
-	"shm_manager_socket_name": "manager",
+	"shm": {
+		"socket_dir": "/tmp/nl_shm",
+		"manager_socket_name": "manager"
+	},
 
 	"log": {
-		"level": "debug",
-		"path_shm": "/tmp/nl-log/shm.log",
-		"path_main": "/tmp/nl-log/nl.log"
+		"main": {
+			"level": "debug",
+			"path": "/tmp/nl-log/nl.log",
+			"stdout": true
+		},
+		"shm": {
+			"level": "debug",
+			"path": "/tmp/nl-log/shm.log",
+			"stdout": true
+		}
 	},
 
 	"cluster_nodes": {

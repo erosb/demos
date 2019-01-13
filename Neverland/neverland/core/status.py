@@ -19,4 +19,4 @@ class ClusterControllingStatus(metaclass=MetaEnum):
     WAITING_FOR_LEAVE = 0x02
 
     # This status means a node is normally working on its duty
-    WORKING = 0xf1
+    WORKING = 0x21

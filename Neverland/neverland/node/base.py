@@ -72,7 +72,7 @@ class BaseNode():
         self.shm_worker_pid = None
 
     def _write_master_pid(self):
-        pid_path = self.config.pid_file
+        pid_path = self.config.basic.pid_file
         pid = os.getpid()
 
         with open(pid_path, 'w') as f:
@@ -87,7 +87,7 @@ class BaseNode():
         logger.debug(f'Start to shut down workers')
         self.shutdown_workers()
 
-        pid_path = self.config.pid_file
+        pid_path = self.config.basic.pid_file
         if os.path.isfile(pid_path):
             logger.debug(f'Remove pid file: {pid_path}')
             os.remove(pid_path)
@@ -263,7 +263,7 @@ class BaseNode():
             logger.info(f'Started SharedMemoryManager: {pid}')
 
         # start normal workers
-        worker_amount = self.config.worker_amount
+        worker_amount = self.config.basic.worker_amount
         for _ in range(worker_amount):
             pid = os.fork()
 

@@ -8,11 +8,11 @@ from logging import handlers as logging_handlers
 from neverland.exceptions import ConfigError
 
 
-SHM_LOGGER_NAME = 'SHM'
-
-LOGGERS_NAMES = [
-    'Main',
-]
+# mapping names of loggers and the keyword of their config
+LOGGER_NAME_CONFIG_KW_MAPPING = {
+    'Main': 'main',
+    'SHM': 'shm',
+}
 
 
 main_logger = logging.getLogger('Main')
@@ -20,32 +20,27 @@ logger = logging.getLogger('Main')
 
 
 def init_all_loggers(config):
-    log_level = config.log.level
-    main_log_path = config.log.path_main
-    shm_log_path = config.log.path_shm
-
-    if main_log_path is None or shm_log_path is None:
-        raise ConfigError('log.path_main and log.path_shm are both required')
-
     lv_map = {
         'debug': logging.DEBUG,
         'info': logging.INFO,
         'warn': logging.WARN,
         'error': logging.ERROR,
     }
-    lv = lv_map.get(log_level) or logging.INFO
 
-    for logger_name in LOGGERS_NAMES:
+    for logger_name, conf_kw in LOGGER_NAME_CONFIG_KW_MAPPING.items():
         logger = logging.getLogger(logger_name)
-        init_logger(logger, lv, main_log_path)
+        logger_conf = getattr(config.log, conf_kw)
 
-    logger = logging.getLogger(SHM_LOGGER_NAME)
-    init_logger(logger, lv, shm_log_path)
+        level = lv_map.get(logger_conf.level) or logging.INFO
+        paht = logger_conf.path
+        stdout_enabled = logger_conf.stdout
 
-    main_logger.info(f'Log level: {log_level}')
+        init_logger(logger, level, path, stdout_enabled)
+
+    main_logger.info(f'Main log level: {log_level}')
 
 
-def init_logger(logger, lv, log_path=None):
+def init_logger(logger, lv, log_path=None, stdout_enabled=True):
     logger.setLevel(lv)
 
     formatter = logging.Formatter(
@@ -58,8 +53,10 @@ def init_logger(logger, lv, log_path=None):
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
-    sh = logging.StreamHandler(sys.stdout)
-    sh.setLevel(lv)
-    sh.setFormatter(formatter)
-    logger.addHandler(sh)
+    if stdout_enabled:
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setLevel(lv)
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
+
     return logger

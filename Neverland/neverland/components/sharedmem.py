@@ -220,7 +220,7 @@ class SharedMemoryManager():
 
         self.sensitive = sensitive
         self.config = config
-        self.socket_dir = config.shm_socket_dir
+        self.socket_dir = config.shm.socket_dir
 
         ## the current connection between the SharedMemoryManager worker
         self.current_connection = None
@@ -228,7 +228,7 @@ class SharedMemoryManager():
         ## attributes below are for the SharedMemoryManager worker
         self.worker_socket_path = os.path.join(
                                       self.socket_dir,
-                                      self.config.shm_manager_socket_name,
+                                      self.config.shm.manager_socket_name,
                                   )
 
         self.__running = False
