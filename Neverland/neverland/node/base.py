@@ -26,6 +26,7 @@ from neverland.logic.v0.controller.logic_handler import ControllerLogicHandler
 from neverland.logic.v0.outlet.logic_handler import OutletLogicHandler
 from neverland.logic.v0.relay.logic_handler import RelayLogicHandler
 from neverland.protocol.v0 import ProtocolWrapper
+from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.protocol.v0.fmt import (
     HeaderFormat,
     DataPktFormat,
@@ -245,8 +246,8 @@ class BaseNode():
 
         self.logic_handler.init_shm()
 
-        self.core.init_shm()
         self.core.self_allocate_core_id()
+        self.core.init_shm()
 
         logger.debug('Additional init step for node modules done')
 
@@ -265,7 +266,7 @@ class BaseNode():
             events = epoll.poll(8)
             for fd, evt in events:
                 if evt & select.EPOLLERR:
-                    pass
+                    continue
                 elif evt & select.EPOLLIN:
                     pkt = afferent.recv()
 
@@ -279,9 +280,16 @@ class BaseNode():
 
                     self.protocol_wrapper.unwrap(pkt)
                     if not pkt.valid:
+                        logger.warn(
+                            f'Invalid packet of cluster joining '
+                            f'response from {p_hop_ip}'
+                        )
                         continue
 
-                    # TODO to be continued...
+                    if pkt.fields.subject == ClusterControllingSubject.RESPONSE:
+                        content = pkt.fields.content.body
+
+                # TODO to be continued......
 
         raise FailedToJoinCluster
 

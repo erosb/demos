@@ -12,6 +12,7 @@ from neverland.utils import ObjectifiedDict, get_localhost_ip
 from neverland.exceptions import DropPakcet, ConfigError
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.core.status import ClusterControllingStatus
+from neverland.components.idgeneration import IDGenerator
 from neverland.components.sharedmem import (
     SHMContainerTypes,
     SharedMemoryManager,
@@ -81,6 +82,7 @@ class BaseCore():
         self.logic_handler = logic_handler
         self.protocol_wrapper = protocol_wrapper
 
+        self.id_generator = IDGenerator()
         self.shm_mgr = SharedMemoryManager(self.config)
 
         self.plug_afferent(self.main_afferent)

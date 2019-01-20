@@ -9,7 +9,11 @@ import unittest
 
 import __code_path__
 from neverland.utils import ObjectifiedDict
-from neverland.components.sharedmem import SharedMemoryManager, SHMContainerTypes
+from neverland.components.sharedmem import (
+    SharedMemoryManager,
+    SHMContainerTypes,
+    ReturnCodes,
+)
 
 
 json_config = {
@@ -89,7 +93,7 @@ def launch_shm_worker():
 # Test case for SharedMemoryManager
 class SHMTest(unittest.TestCase):
 
-    def test_0_except_set(self):
+    def test_0_normal_ops(self):
         shm_mgr = SharedMemoryManager(config)
         shm_mgr.connect('test')
         print('conn_id: ', shm_mgr.current_connection.conn_id)
@@ -158,11 +162,80 @@ class SHMTest(unittest.TestCase):
         shm_mgr.disconnect()
         self.assertEqual(shm_mgr.current_connection, None)
 
+    def test_2_rcode(self):
+        shm_mgr = SharedMemoryManager(config)
+        shm_mgr.connect('test_err')
+
+        print('\n\n=====================key-error-test====================')
+        resp = shm_mgr.add_value(
+                   key='not_exists',
+                   value='a'
+               )
+        print(resp)
+        self.assertEqual(resp.get('succeeded'), False)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.KEY_ERROR)
+
+        print('\n\n=====================type-error-test====================')
+        resp = shm_mgr.create_key(
+                   'testing',
+                   SHMContainerTypes.DICT,
+                   value='a'
+               )
+        print(resp)
+        self.assertEqual(resp.get('succeeded'), False)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.TYPE_ERROR)
+
+        print('\n\n===================unlock-not-locked-test==================')
+        resp = shm_mgr.unlock('testing')
+        print(resp)
+        self.assertEqual(resp.get('succeeded'), True)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.NOT_LOCKED)
+
+        print('\n\n=====================lock-test====================')
+        print('------create-container------')
+        resp = shm_mgr.create_key(
+                   'testing',
+                   SHMContainerTypes.LIST,
+               )
+        self.assertEqual(resp.get('succeeded'), True)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
+
+        print('------lock-container------')
+        resp = shm_mgr.lock('testing')
+        print(resp)
+        self.assertEqual(resp.get('succeeded'), True)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
+
+        print('------access-locked-container------')
+        shm_mgr1 = SharedMemoryManager(config)
+        shm_mgr1.connect('test_err_1')
+        resp = shm_mgr1.add_value('testing', [1, 2, 3])
+        print(resp)
+        self.assertEqual(resp.get('succeeded'), False)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.LOCKED)
+
+        print('------unlock-container----------')
+        resp = shm_mgr.unlock('testing')
+        print(resp)
+        self.assertEqual(resp.get('succeeded'), True)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
+
+        print('------access-locked-container-again------')
+        resp = shm_mgr1.add_value('testing', [1, 2, 3])
+        print(resp)
+        self.assertEqual(resp.get('succeeded'), True)
+        self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
+
+        shm_mgr.disconnect()
+        shm_mgr1.disconnect()
+
 
 if __name__ == '__main__':
     pid = launch_shm_worker()
 
     # pid from fork
     if pid > 0:
-        unittest.main()
-        os.kill(worker_pid, sig.SIGKILL)
+        try:
+            unittest.main()
+        finally:
+            os.kill(worker_pid, sig.SIGTERM)

@@ -7,6 +7,7 @@ from neverland.protocol.base import (
     BasePktFormat,
     salt_calculator,
     mac_calculator,
+    serial_calculator,
     time_calculator,
 )
 
@@ -56,8 +57,10 @@ class HeaderFormat(BasePktFormat):
 
             # Each UDP packet shall have a serial number as its identifier.
             'serial': FieldDefinition(
-                          length = 8,
-                          type   = FieldTypes.STRUCT_U_LONG_LONG,
+                          length        = 8,
+                          type          = FieldTypes.STRUCT_U_LONG_LONG,
+                          calculator    = serial_calculator,
+                          calc_priority = 0x00,
                       ),
 
             # The timestamp of the creation of the packet

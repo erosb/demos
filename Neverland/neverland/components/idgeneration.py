@@ -12,7 +12,7 @@ class IDGenerator():
     So, it's meaningful to make a unique ID for each packet.
 
     As a decision, I choosed the snowflake algorithm. As an adaptation,
-    I slightly changed the format of the bit fields.
+    I slightly changed the format of bit fields.
 
     Format:
 

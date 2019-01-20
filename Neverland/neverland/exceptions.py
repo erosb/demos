@@ -44,6 +44,10 @@ class SharedMemoryError(Exception):
     pass
 
 
+class SHMContainerLocked(SharedMemoryError):
+    pass
+
+
 class SHMWorkerNotConnected(SharedMemoryError):
     pass
 

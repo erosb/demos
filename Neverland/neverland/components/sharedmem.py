@@ -10,6 +10,7 @@ import logging
 from neverland.exceptions import (
     AddressAlreadyInUse,
     SharedMemoryError,
+    SHMContainerLocked,
     SHMResponseTimeout,
     SHMWorkerNotConnected,
     SHMWorkerConnectFailed,
@@ -137,12 +138,6 @@ MSG_TIMEOUT = 'SharedMemoryManager worker timeout'
 
 class Actions(metaclass=MetaEnum):
 
-    # create a new connection
-    CONNECT = 0xf0
-
-    # close a connection
-    DISCONNECT = 0xff
-
     # create a new key value pair, this will override the existing value
     CREATE = 0x01
 
@@ -160,6 +155,51 @@ class Actions(metaclass=MetaEnum):
 
     # remove a value from a key if the key points to a set/dict/list
     REMOVE = 0x12
+
+    # acquire the lock of a container and lock it
+    LOCK = 0x21
+
+    # release a lock
+    UNLOCK = 0x22
+
+    # create a new connection
+    CONNECT = 0xf0
+
+    # close a connection
+    DISCONNECT = 0xff
+
+
+ACTIONS_2_HANDLE_LOCK = [
+    Actions.CREATE,
+    Actions.READ,
+    Actions.SET,
+    Actions.ADD,
+    Actions.CLEAN,
+    Actions.REMOVE,
+    Actions.LOCK,
+    Actions.UNLOCK,
+]
+
+class ReturnCodes(metaclass=MetaEnum):
+
+    # request completed successfully
+    OK = 0x00
+
+    # The container which client side is accessing dose not exists
+    KEY_ERROR = 0x11
+
+    # Value type is not matched with the container's type
+    # or value type is not supported.
+    TYPE_ERROR = 0x12
+
+    # The container which client side is accessing has been locked
+    LOCKED = 0x21
+
+    # The container which client side is trying to unlock is not locked
+    NOT_LOCKED = 0x22
+
+    # something bad happend :(
+    UNKNOWN_ERROR = 0xff
 
 
 class SHMContainerTypes(metaclass=MetaEnum):
@@ -235,6 +275,10 @@ class SharedMemoryManager():
 
         # the resource container, all shared memories will be stored in it
         self.resources = {}
+
+        # locks have been acquired by the client side
+        # structure: {resources.key: connection_id}
+        self.locks = {}
 
         # connection container, all established connections will be stored in it
         # structure: {connection_id: Connection}
@@ -322,12 +366,16 @@ class SharedMemoryManager():
     def _remove_connection(self, conn_id):
         self.connections.pop(conn_id, None)
 
-    def _gen_response_json(self, conn_id, succeeded, value=None):
+    def _gen_response_json(self, conn_id, succeeded, value=None, rcode=None):
+        if rcode is None:
+            rcode = ReturnCodes.OK if succeeded else ReturnCodes.UNKNOWN_ERROR
+
         return {
             'conn_id': conn_id,
             'data': {
                 'succeeded': succeeded,
                 'value': value,
+                'rcode': rcode,
             }
         }
 
@@ -349,12 +397,39 @@ class SharedMemoryManager():
                 'succeeded': True,
                 'conn_id': conn_id,
                 'value': None,
+                'rcode': ReturnCodes.OK,
             }
         }
 
     def handle_disconnect(self, data):
         self._remove_connection(data.conn_id)
         return None
+
+    def handle_lock(self, data):
+        key = data.key
+        conn_id = data.conn_id
+
+        # Actually, we have done all necessary verifications before invoking
+        # this method. And we don't need to verify if the key exists, because
+        # pre-locking is allowed.
+        self.locks.update(
+            {key: conn_id}
+        )
+        return self._gen_response_json(conn_id=conn_id, succeeded=True)
+
+    def handle_unlock(self, data):
+        key = data.key
+        conn_id = data.conn_id
+
+        if key not in self.locks:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=True,
+                rcode=ReturnCodes.NOT_LOCKED,
+            )
+
+        self.locks.pop(key)
+        return self._gen_response_json(conn_id=conn_id, succeeded=True)
 
     def handle_create(self, data):
         key = data.key
@@ -370,7 +445,11 @@ class SharedMemoryManager():
                 not isinstance(value, compatible_type)
             )
         ):
-            return self._gen_response_json(conn_id=conn_id, succeeded=False)
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.TYPE_ERROR,
+            )
 
         py_type = PY_TYPE_MAPPING.get(type_)
         container = py_type()
@@ -391,7 +470,11 @@ class SharedMemoryManager():
         key = data.key
 
         if key not in self.resources:
-            return self._gen_response_json(conn_id=conn_id, succeeded=False)
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
 
         return self._gen_response_json(
             conn_id=conn_id,
@@ -404,14 +487,22 @@ class SharedMemoryManager():
         value = data.value
         conn_id = data.conn_id
 
-        if key in self.resources:
-            if type(self.resources.get(key)) not in (int, float, bool, str):
-                return self._gen_response_json(conn_id=conn_id, succeeded=False)
-            else:
-                self.resources[key] = value
-                return self._gen_response_json(conn_id=conn_id, succeeded=True)
+        if key not in self.resources:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
+
+        if type(self.resources.get(key)) not in (int, float, bool, str):
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.TYPE_ERROR,
+            )
         else:
-            return self._gen_response_json(conn_id=conn_id, succeeded=False)
+            self.resources[key] = value
+            return self._gen_response_json(conn_id=conn_id, succeeded=True)
 
     def handle_add(self, data):
         key = data.key
@@ -419,39 +510,70 @@ class SharedMemoryManager():
         conn_id = data.conn_id
 
         if key not in self.resources:
-            return self._gen_response_json(conn_id=conn_id, succeeded=False)
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
 
         try:
             self._add_value_2_container(key, value)
-        except (TypeError, ValueError):
-            return self._gen_response_json(conn_id=conn_id, succeeded=False)
-        else:
             return self._gen_response_json(conn_id=conn_id, succeeded=True)
+        except TypeError:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.TYPE_ERROR,
+            )
+        except ValueError:
+            return self._gen_response_json(conn_id=conn_id, succeeded=False)
 
     def handle_clean(self, data):
         key = data.key
         value = data.value
         conn_id = data.conn_id
 
-        if key in self.resources:
-            self.resources.pop(key)
-            return self._gen_response_json(conn_id=conn_id, succeeded=True)
-        else:
-            return self._gen_response_json(conn_id=conn_id, succeeded=False)
+        if key not in self.resources:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
+
+        self.resources.pop(key)
+        return self._gen_response_json(conn_id=conn_id, succeeded=True)
 
     def handle_remove(self, data):
         key = data.key
         value = data.value
         conn_id = data.conn_id
 
-        if key in self.resources:
-            try:
-                self._remove_value_from_container(key, *value)
-                return self._gen_response_json(conn_id=conn_id, succeeded=True)
-            except TypeError:
-                pass
+        if key not in self.resources:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
 
-        return self._gen_response_json(conn_id=conn_id, succeeded=False)
+        self._remove_value_from_container(key, *value)
+        return self._gen_response_json(conn_id=conn_id, succeeded=True)
+
+    def prehandle_lock(self, data):
+        ''' prehandle the lock
+
+        If the client is trying to access a locked container,
+        then we raise a SHMContainerLocked error here
+        '''
+
+        if not data.action in ACTIONS_2_HANDLE_LOCK:
+            return
+
+        conn_id = self.locks.get(data.key)
+
+        if conn_id is None:
+            return
+        elif conn_id != data.conn_id:
+            raise SHMContainerLocked
 
     def handle_request(self, data):
         try:
@@ -469,10 +591,15 @@ class SharedMemoryManager():
             # same as above
             return
 
-        if data.action == Actions.CONNECT:
-            return self.handle_connect(data)
-        if data.action == Actions.DISCONNECT:
-            return self.handle_disconnect(data)
+        try:
+            self.prehandle_lock(data)
+        except SHMContainerLocked:
+            return self._gen_response_json(
+                conn_id=data.conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.LOCKED,
+            )
+
         if data.action == Actions.CREATE:
             return self.handle_create(data)
         if data.action == Actions.READ:
@@ -485,6 +612,14 @@ class SharedMemoryManager():
             return self.handle_clean(data)
         if data.action == Actions.REMOVE:
             return self.handle_remove(data)
+        if data.action == Actions.LOCK:
+            return self.handle_lock(data)
+        if data.action == Actions.UNLOCK:
+            return self.handle_unlock(data)
+        if data.action == Actions.CONNECT:
+            return self.handle_connect(data)
+        if data.action == Actions.DISCONNECT:
+            return self.handle_disconnect(data)
 
     def handle_responding(self, resp):
         ''' handle responding
@@ -627,6 +762,28 @@ class SharedMemoryManager():
         except (UnicodeDecodeError, ValueError):
             logger.error(MSG_INVALID_DATA)
             raise SharedMemoryError(MSG_INVALID_DATA)
+
+    def lock(self, key):
+        ''' acquire the lock of a container
+        '''
+
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.LOCK,
+            key=key,
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def unlock(self, key):
+        ''' release the lock of a container
+        '''
+
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.UNLOCK,
+            key=key,
+        )
+        return self.read_response(self.current_connection.conn_id)
 
     def create_key(self, key, type_, value=None):
         ''' create a new container
