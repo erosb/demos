@@ -8,12 +8,21 @@ import logging
 
 from neverland.pkt import UDPPacket, PktTypes
 from neverland.node.context import NodeContext
-from neverland.utils import ObjectifiedDict, get_localhost_ip
-from neverland.exceptions import DropPakcet, ConfigError
+from neverland.utils import (
+    Converter,
+    ObjectifiedDict,
+    get_localhost_ip,
+)
+from neverland.exceptions import (
+    DropPakcet,
+    ConfigError,
+    SharedMemoryError,
+)
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.core.status import ClusterControllingStatus
 from neverland.components.idgeneration import IDGenerator
 from neverland.components.sharedmem import (
+    ReturnCodes,
     SHMContainerTypes,
     SharedMemoryManager,
 )
@@ -117,6 +126,25 @@ class BaseCore():
         ''' Let the core pick up an id for itself
         '''
 
+        resp = self.shm_mgr.lock(self.SHM_KEY_CORE_ID)
+
+        if not resp.get('succeeded'):
+            rcode = resp.get('rcode')
+            if rcode == ReturnCodes.LOCKED:
+                try:
+                    time.sleep(0.001)
+                    self.self_allocate_core_id()
+                    return
+                except RecursionError:
+                    raise SharedMemoryError(
+                        f'deadlock of key: {self.SHM_KEY_CORE_ID}'
+                    )
+            else:
+                hex_rcode = ConfigError.int_2_hex(rcode)
+                raise SharedMemoryError(
+                    f'Unexpected SHM return code: {hex_rcode}'
+                )
+
         resp = self.shm_mgr.read_key(self.SHM_KEY_CORE_ID)
         allocated_id = resp.get('value')
 
@@ -132,6 +160,7 @@ class BaseCore():
         )
         self.core_id = id_
 
+        self.shm_mgr.unlock(self.SHM_KEY_CORE_ID)
         logger.debug(
             f'core of worker {NodeContext.pid} has self-allocated id: {id_}'
         )
@@ -259,7 +288,7 @@ class BaseCore():
 
                 if evt & select.EPOLLERR:
                     self.unplug_afferent(fd)
-                    afferent.distory()
+                    afferent.destory()
                 elif evt & select.EPOLLIN:
                     pkt = afferent.recv()
                     self.handle_pkt(pkt)

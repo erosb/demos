@@ -205,13 +205,30 @@ class BaseNode():
 
         logger.debug('Node context created')
 
-    def _load_shm_mgr(self):
+    def _clean_context(self):
+        NodeContext.core = None
+        NodeContext.pid = None
+        NodeContext.local_ip = None
+
+        logger.debug('Node context cleaned')
+
+    def _start_shm_mgr(self):
         self.shm_mgr = SharedMemoryManager(self.config)
-        logger.debug('SharedMemoryManager loaded')
+
+        # start SharedMemoryManager worker
+        pid = os.fork()
+        if pid == -1:
+            raise OSError('fork failed')
+        elif pid == 0:
+            self._sig_shm_worker()
+            self._load_shm_mgr()
+            self.shm_mgr.run_as_worker()
+            return  # the sub-process ends here
+        else:
+            self.shm_worker_pid = pid
+            logger.info(f'Started SharedMemoryManager: {pid}')
 
     def _load_modules(self):
-        self._load_shm_mgr()
-
         self.afferent_cls = AFFERENT_MAPPING[self.role]
         self.main_afferent = self.afferent_cls(self.config)
 
@@ -240,7 +257,19 @@ class BaseNode():
 
         logger.debug('Node modules loaded')
 
-    def _prepare_modules(self):
+    def _clean_modules(self):
+        self.core.shutdown()
+        self.main_afferent.destroy()
+
+        self.main_afferent = None
+        self.efferent = None
+        self.protocol_wrapper = None
+        self.logic_handler = None
+        self.core = None
+
+        logger.debug('Node modules cleaned')
+
+    def _get_modules_ready(self):
         ''' an additional init step for part of modules
         '''
 
@@ -296,23 +325,20 @@ class BaseNode():
     def run(self):
         self.daemonize()
         self._write_master_pid()
+        self._start_shm_mgr()
 
-        # start SharedMemoryManager worker
-        pid = os.fork()
-        if pid == -1:
-            raise OSError('fork failed')
-        elif pid == 0:
-            self._sig_shm_worker()
-            self._load_shm_mgr()
-            self.shm_mgr.run_as_worker()
-            return  # the sub-process ends here
-        else:
-            self.shm_worker_pid = pid
-            logger.info(f'Started SharedMemoryManager: {pid}')
+        # Before we join the cluster, we need to load modules at first,
+        # once we have joined the cluster, modules in the Master worker
+        # shall be removed.
+        self._load_modules()
+        self._create_context()
+        self._get_modules_ready()
 
         # Before we start workers, we need to join the cluster first.
         if self.role != Roles.CONTROLLER:
             self.join_cluster()
+
+        self._clean_modules()
 
         # start normal workers
         worker_amount = self.config.basic.worker_amount
@@ -325,7 +351,7 @@ class BaseNode():
                 self._sig_normal_worker()
                 self._load_modules()
                 self._create_context()
-                self._prepare_modules()
+                self._get_modules_ready()
                 self.core.run()
                 return  # the sub-process ends here
             else:

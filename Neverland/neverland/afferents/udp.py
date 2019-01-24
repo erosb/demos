@@ -46,7 +46,7 @@ class UDPReceiver():
             (self.listen_addr, self.listen_port)
         )
 
-    def distory(self):
+    def destory(self):
         self._sock.close()
         self._sock = None
 

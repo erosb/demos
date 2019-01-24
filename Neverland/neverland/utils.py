@@ -114,6 +114,14 @@ class HashTools():
         return cls._hash('sha512', data)
 
 
+class Converter():
+
+    @classmethod
+    def int_2_hex(cls, num, lower_case=False):
+        s = '{0:x}' if lower_case else '{0:X}'
+        return s.format(num)
+
+
 class _BaseEnum():
 
     ''' The base enumeration class
