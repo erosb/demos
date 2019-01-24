@@ -114,10 +114,6 @@ def serial_calculator(pkt, header_fmt, body_fmt):
     ''' calculator for the serial field
     '''
 
-    salt_definition = header_fmt.__fmt__.get('salt')
-    salt_len = salt_definition.length
-    return os.urandom(salt_len)
-
 
 def salt_calculator(pkt, header_fmt, body_fmt):
     ''' calculator for the salt field
