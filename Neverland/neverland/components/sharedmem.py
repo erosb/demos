@@ -768,6 +768,7 @@ class SharedMemoryManager():
             logger.warn(
                 f'Socket <{conn.resp_socket}> closed when sending back response'
             )
+            self._remove_connection(conn_id)
 
     def run_as_worker(self):
         self._epoll = select.epoll()
