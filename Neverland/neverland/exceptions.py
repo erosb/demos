@@ -26,7 +26,7 @@ class AddressAlreadyInUse(Exception):
     pass
 
 
-class DropPakcet(Exception):
+class DropPacket(Exception):
 
     ''' Current packet shall be dropped
     '''
@@ -45,6 +45,10 @@ class SharedMemoryError(Exception):
 
 
 class SHMContainerLocked(SharedMemoryError):
+    pass
+
+
+class SHMRequestBacklogged(SharedMemoryError):
     pass
 
 

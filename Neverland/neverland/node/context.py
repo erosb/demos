@@ -18,3 +18,6 @@ class NodeContext():
 
     # local IP address
     local_ip = None
+
+    # the IDGenerator instance
+    id_generator = None

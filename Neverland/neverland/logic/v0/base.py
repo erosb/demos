@@ -2,7 +2,7 @@
 #coding: utf-8
 
 from neverland.pkt import PktTypes
-from neverland.exceptions import DropPakcet
+from neverland.exceptions import DropPacket
 from neverland.logic.base import BaseLogicHandler as _BaseLogicHandler
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.components.sharedmem import SharedMemoryManager

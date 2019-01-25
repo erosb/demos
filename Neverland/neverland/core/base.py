@@ -14,9 +14,10 @@ from neverland.utils import (
     get_localhost_ip,
 )
 from neverland.exceptions import (
-    DropPakcet,
+    DropPacket,
     ConfigError,
     SharedMemoryError,
+    SHMResponseTimeout,
 )
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.core.status import ClusterControllingStatus
@@ -126,24 +127,22 @@ class BaseCore():
         ''' Let the core pick up an id for itself
         '''
 
-        resp = self.shm_mgr.lock(self.SHM_KEY_CORE_ID)
+        try:
+            resp = self.shm_mgr.lock_key(self.SHM_KEY_CORE_ID)
+        except SHMResponseTimeout:
+            # Currently, SHM_MAX_BLOCKING_TIME is 4 seconds and
+            # these works can definitely be done in 4 seconds.
+            # If a SHMResponseTimeout occurred, then there must
+            # be a deadlock
+            raise SHMResponseTimeout(
+                f'deadlock of key: {self.SHM_KEY_CORE_ID}'
+            )
 
         if not resp.get('succeeded'):
             rcode = resp.get('rcode')
-            if rcode == ReturnCodes.LOCKED:
-                try:
-                    time.sleep(0.001)
-                    self.self_allocate_core_id()
-                    return
-                except RecursionError:
-                    raise SharedMemoryError(
-                        f'deadlock of key: {self.SHM_KEY_CORE_ID}'
-                    )
-            else:
-                hex_rcode = ConfigError.int_2_hex(rcode)
-                raise SharedMemoryError(
-                    f'Unexpected SHM return code: {hex_rcode}'
-                )
+            raise SharedMemoryError(
+                f'SHM error with rcode: {hex_rcode}'
+            )
 
         resp = self.shm_mgr.read_key(self.SHM_KEY_CORE_ID)
         allocated_id = resp.get('value')
@@ -160,7 +159,7 @@ class BaseCore():
         )
         self.core_id = id_
 
-        self.shm_mgr.unlock(self.SHM_KEY_CORE_ID)
+        self.shm_mgr.unlock_key(self.SHM_KEY_CORE_ID)
         logger.debug(
             f'core of worker {NodeContext.pid} has self-allocated id: {id_}'
         )
@@ -273,7 +272,7 @@ class BaseCore():
 
         try:
             pkt = self.logic_handler.handle_logic(pkt)
-        except DropPakcet:
+        except DropPacket:
             return
 
         pkt = self.protocol_wrapper.wrap(pkt)

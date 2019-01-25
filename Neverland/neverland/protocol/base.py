@@ -8,6 +8,7 @@ import struct
 
 from neverland.pkt import UDPPacket, PktTypes, FieldTypes
 from neverland.utils import ObjectifiedDict, HashTools
+from neverland.node.context import NodeContext
 from neverland.exceptions import (
     PktWrappingError,
     PktUnwrappingError,
@@ -113,6 +114,14 @@ class ComplexedFormat(BasePktFormat):
 def serial_calculator(pkt, header_fmt, body_fmt):
     ''' calculator for the serial field
     '''
+
+    id_generator = NodeContext.id_generator
+    if id_generator is None:
+        raise RuntimeError(
+            'Node modules are not ready to generate packet serial numbers'
+        )
+
+    return id_generator.gen()
 
 
 def salt_calculator(pkt, header_fmt, body_fmt):

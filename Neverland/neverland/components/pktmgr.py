@@ -1,7 +1,11 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
-from neverland.components.sharedmem import SharedMemoryManager
+from neverland.node.context import NodeContext
+from neverland.components.sharedmem import (
+    SharedMemoryManager,
+    SHMContainerTypes,
+)
 
 
 class SpecialPacketManager():
@@ -13,8 +17,8 @@ class SpecialPacketManager():
     #     {
     #         id: {
     #             fields: {}
-    #             src: (ip, port),
-    #             dest: (ip, port),
+    #             src: [ip, port],
+    #             dest: [ip, port],
     #         }
     #     }
     SHM_KEY_PKTS = 'SpecPktMgr_Packets'
@@ -31,6 +35,18 @@ class SpecialPacketManager():
             self.SHM_SOCKET_NAME_TEMPLATE % NodeContext.pid
         )
         self.shm_mgr.create_key(
-            self.SHM_KEY_CLUSTER_NODES,
+            self.SHM_KEY_PKTS,
             SHMContainerTypes.DICT,
         )
+
+    def _store_pkt_to_shm(self, dict_pkt):
+        self.shm_mgr.lock(self.SHM_KEY_PKTS)
+
+    def _get_pkt_from_shm(self, pkt_id):
+        pass
+
+    def store_pkt(self, pkt):
+        pass
+
+    def get_pkt(self, pkt_id):
+        pass

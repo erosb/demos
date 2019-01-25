@@ -2,7 +2,7 @@
 #coding: utf-8
 
 from neverland.pkt import PktTypes
-from neverland.exceptions import DropPakcet
+from neverland.exceptions import DropPacket
 
 
 class BaseLogicHandler():
@@ -28,7 +28,7 @@ class BaseLogicHandler():
         elif pkt.fields.type == PktTypes.CONN_CTRL:
             return self.handle_conn_ctrl
         else:
-            raise DropPakcet
+            raise DropPacket
 
     def handle_data(self, pkt):
         pass

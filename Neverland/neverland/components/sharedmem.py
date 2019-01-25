@@ -8,9 +8,11 @@ import socket
 import logging
 
 from neverland.exceptions import (
+    DropPacket,
     AddressAlreadyInUse,
     SharedMemoryError,
     SHMContainerLocked,
+    SHMRequestBacklogged,
     SHMResponseTimeout,
     SHMWorkerNotConnected,
     SHMWorkerConnectFailed,
@@ -56,12 +58,39 @@ The protocol of communication:
 
     Then, we can simply transfer stringified JSON through the socket.
 
+    Fields in request body:
+
+        socket:
+            name of the socket to recieve responses
+
+        conn_id:
+            connection ID acquired from the response of establishing a connection
+
+        action:
+            tell server side what to do, choose from Actions
+
+        key:
+            container name
+
+        type:
+            container type
+
+        value:
+            value of container
+
+        backlogging:
+            backlog the request if the container is locked, if backlogging
+            is not enabled, then the server side shall respond immediately
+            with the return code 0x21
+
+            Default: True
+
 
     JSON structures in request:
 
         if action in [CONNECT]:
             {
-                "socket": name of the socket to recieve responses,
+                "socket": str,
                 "action": int,
             }
 
@@ -76,16 +105,27 @@ The protocol of communication:
                 "conn_id": str,
                 "action": int,
                 "key": str,
-                "type": type of the container,
-                "value": optional value(s) that will be put into the container,
+                "type": int,
+                "value": same with the container type,
+                "backlogging": bool,
             }
 
-        if action in [ADD, REMOVE]:
+        if action in [ADD]:
             {
                 "conn_id": str,
                 "action": int,
                 "key": str,
-                "value": any available type in JSON,
+                "value": same with the container type,
+                "backlogging": bool,
+            }
+
+        if action in [REMOVE]:
+            {
+                "conn_id": str,
+                "action": int,
+                "key": str,
+                "value": list of values need to be removed,
+                "backlogging": bool,
             }
 
         if action in [SET]:
@@ -93,17 +133,27 @@ The protocol of communication:
                 "conn_id": str,
                 "action": int,
                 "key": str,
-                "value": str/int/float/bool,
+                "value": same with the container type,
+                "backlogging": bool,
             }
 
             The SET action has been limited, it can only be used on
-            str/int/float/bool types.
+            single-value containers.
 
         if action in [READ, CLEAN]:
             {
                 "conn_id": str,
                 "action": int,
                 "key": str,
+                "backlogging": bool,
+            }
+
+        if action in [LOCK, UNLOCK]:
+            {
+                "conn_id": str,
+                "action": int,
+                "key": str,
+                "backlogging": bool,
             }
 
 
@@ -113,6 +163,7 @@ The protocol of communication:
             {
                 'succeeded': bool,
                 'value': the requested value,  # sets will be responded in lists
+                'rcode': the return code,
             }
 
         if action == DISCONNECT:
@@ -124,11 +175,11 @@ The protocol of communication:
 logger = logging.getLogger('SHM')
 
 
-POLL_TIMEOUT = 4
+POLL_TIMEOUT = 1
 UDP_BUFFER_SIZE = 65535
 
 # The max blocing time at the client side of the SharedMemoryManager
-SHM_MAX_BLOCKING_TIME = 2
+SHM_MAX_BLOCKING_TIME = 4
 
 MSG_NOT_CONNECTED = 'Not connected with SharedMemoryManager Worker yet'
 MSG_CONN_FAILED = 'Failed to connect to SharedMemoryManager Worker'
@@ -147,13 +198,13 @@ class Actions(metaclass=MetaEnum):
     # change value of a key
     SET = 0x03
 
-    # add a new value into a key if the key points to a set/dict/list
+    # add a new value into a multi-value container
     ADD = 0x04
 
     # completely remove a key from stored resources
     CLEAN = 0x11
 
-    # remove a value from a key if the key points to a set/dict/list
+    # remove a value from a multi-value container
     REMOVE = 0x12
 
     # acquire the lock of a container and lock it
@@ -204,6 +255,13 @@ class ReturnCodes(metaclass=MetaEnum):
 
 class SHMContainerTypes(metaclass=MetaEnum):
 
+    # Actually, we treat all types as "containers". And here, the difference
+    # between STR and LIST type is only the size of the container, STR can
+    # contain only one value but LIST can contain multiple, that's all.
+    # So, we name these types as "single-value container".
+    #
+    # But the difference still makes things different, these single-value
+    # containers shall not be supported by Actions.ADD and Actions.REMOVE
     STR = 0x01
     INT = 0x02
     FLOAT = 0x03
@@ -284,6 +342,15 @@ class SharedMemoryManager():
         # structure: {connection_id: Connection}
         self.connections = {}
 
+        # Because of the lock mechanism, some of requests can not be handled
+        # promptly, so they will be backlogged and will be handled later.
+        #
+        # structure: {serial_number, data}
+        self.backlogged_requests = {}
+
+        # serial number counter for backlogged_requests
+        self.backlog_serial = 0
+
     def _create_socket(self, socket_path=None, blocking=False):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         sock.setblocking(blocking)
@@ -302,6 +369,10 @@ class SharedMemoryManager():
 
     def gen_conn_id(self):
         return gen_uuid()
+
+    def gen_backlog_serial(self):
+        self.backlog_serial += 1
+        return self.backlog_serial
 
     def get_compatible_value(self, key):
         ''' make the value type become compatible with json
@@ -575,30 +646,57 @@ class SharedMemoryManager():
         elif conn_id != data.conn_id:
             raise SHMContainerLocked
 
-    def handle_request(self, data):
-        try:
-            data = json.loads(data.decode('utf-8'))
-            if not isinstance(data, dict):
-                raise ValueError
-        except (UnicodeDecodeError, ValueError):
-            # If this was the packet which we sent, then it could not
-            # cause any of these errors, so we can simply ignore it.
-            return
+    def handle_request(self, data, data_parsed=False, backlogging=None):
+        ''' handle the request
 
-        data = ObjectifiedDict(**data)
+        :param data: the data of request
+        :param data_parsed: Tell the method if the data has been parsed.
+                            If it has not been parsed then the data shall
+                            be bytes. If it has been parsed, then the data
+                            shall be an ObjectifiedDict
+
+        :param backlogging: To override the backlogging option in the data.
+        '''
+
+        if not data_parsed:
+            try:
+                data = json.loads(data.decode('utf-8'))
+                if not isinstance(data, dict):
+                    raise ValueError
+            except (UnicodeDecodeError, ValueError):
+                # If this was the packet which we sent, then it could not
+                # cause any of these errors, so we can simply ignore it.
+                raise DropPacket
+
+            data = ObjectifiedDict(**data)
 
         if not data.action in Actions:
             # same as above
-            return
+            raise DropPacket
+
+        if backlogging is None:
+            backlogging = data.backlogging
+            backlogging = True if backlogging is None else backlogging
 
         try:
             self.prehandle_lock(data)
         except SHMContainerLocked:
-            return self._gen_response_json(
-                conn_id=data.conn_id,
-                succeeded=False,
-                rcode=ReturnCodes.LOCKED,
-            )
+            if backlogging:
+                serial = self.gen_backlog_serial()
+                self.backlogged_requests.update(
+                    {serial: data}
+                )
+                backlog_count = len(self.backlogged_requests)
+                logger.debug(
+                    f'request backlogged, current: {backlog_count}'
+                )
+                raise SHMRequestBacklogged
+            else:
+                return self._gen_response_json(
+                    conn_id=data.conn_id,
+                    succeeded=False,
+                    rcode=ReturnCodes.LOCKED,
+                )
 
         if data.action == Actions.CREATE:
             return self.handle_create(data)
@@ -621,6 +719,30 @@ class SharedMemoryManager():
         if data.action == Actions.DISCONNECT:
             return self.handle_disconnect(data)
 
+    def handle_backlogged_request(self, bl_serial, data):
+        ''' handle the backlogged request
+
+        :param bl_serial: serial number of backlogged request
+        :param data: data of the request
+        '''
+
+        resp = self.handle_request(data, data_parsed=True, backlogging=False)
+
+        rdata = resp.get('data')
+        succeeded = rdata.get('succeeded')
+        rcode = rdata.get('rcode')
+
+        if not succeeded and rcode == ReturnCodes.LOCKED:
+            raise SHMContainerLocked('Container still locked')
+        else:
+            self.backlogged_requests.pop(bl_serial, None)
+            remaining_bl = len(self.backlogged_requests)
+            logger.debug(
+                f'backlogged request <{bl_serial}> processed, '
+                f'remaining: {remaining_bl}'
+            )
+            return resp
+
     def handle_responding(self, resp):
         ''' handle responding
 
@@ -639,7 +761,13 @@ class SharedMemoryManager():
         conn_id = resp['conn_id']
         conn = self.connections.get(conn_id)
         data = json.dumps(resp['data']).encode()
-        conn.socket.sendto(data, conn.resp_socket)
+
+        try:
+            conn.socket.sendto(data, conn.resp_socket)
+        except ConnectionRefusedError:
+            logger.warn(
+                f'Socket <{conn.resp_socket}> closed when sending back response'
+            )
 
     def run_as_worker(self):
         self._epoll = select.epoll()
@@ -649,7 +777,9 @@ class SharedMemoryManager():
 
         self.__running = True
         while self.__running:
-            events = self._epoll.poll(POLL_TIMEOUT)
+            pt = POLL_TIMEOUT if len(self.backlogged_requests) == 0 else 0.001
+            events = self._epoll.poll(pt)
+
             for fd, evt in events:
                 if evt & select.EPOLLERR:
                     msg = 'Unexpected epoll error occurred'
@@ -657,8 +787,26 @@ class SharedMemoryManager():
                     raise OSError(msg)
                 elif evt & select.EPOLLIN:
                     data, address = self._worker_sock.recvfrom(UDP_BUFFER_SIZE)
-                    resp = self.handle_request(data)
+
+                    try:
+                        resp = self.handle_request(data)
+                        self.handle_responding(resp)
+                    except (DropPacket, SHMRequestBacklogged):
+                        pass
+
+            # we will change self.backlogged_requests during the iteration
+            dup = dict(self.backlogged_requests)
+
+            for bl_serial, data in dup.items():
+                try:
+                    resp = self.handle_backlogged_request(bl_serial, data)
                     self.handle_responding(resp)
+                except SHMContainerLocked:
+                    logger.debug(
+                        f'backlogged request <{bl_serial}> still locked'
+                    )
+                except (DropPacket, SHMRequestBacklogged):
+                    pass
 
         self._worker_sock.close()
         os.remove(self.worker_socket_path)
@@ -673,6 +821,42 @@ class SharedMemoryManager():
             raise RuntimeError(msg)
 
     ## Methods below will be used by the client side
+    def send_request(self, **request_args):
+        conn = self.current_connection
+        if conn is None:
+            raise SHMWorkerNotConnected(MSG_NOT_CONNECTED)
+
+        data = json.dumps(request_args).encode('utf-8')
+        conn.socket.sendto(data, self.worker_socket_path)
+
+    def read_response(self, conn_id):
+        ''' read responses from the worker
+
+        It was designed to be blocking so that the shared memory could works
+        a bit more like the true memory.
+        '''
+
+        conn = self.current_connection
+        if conn is None:
+            raise SHMWorkerNotConnected(MSG_NOT_CONNECTED)
+
+        try:
+            data, address = conn.socket.recvfrom(UDP_BUFFER_SIZE)
+            data = json.loads(data.decode('utf-8'))
+            if not isinstance(data, dict):
+                raise ValueError
+
+            if not data.get('succeeded') and self.sensitive:
+                raise SharedMemoryError('SHM Request unsuccessful')
+
+            return data
+        except socket.timeout:
+            logger.error(MSG_TIMEOUT)
+            raise SHMResponseTimeout(MSG_TIMEOUT)
+        except (UnicodeDecodeError, ValueError):
+            logger.error(MSG_INVALID_DATA)
+            raise SharedMemoryError(MSG_INVALID_DATA)
+
     def connect(self, socket_name):
         ''' Connect to the SharedMemoryManager worker
 
@@ -727,43 +911,7 @@ class SharedMemoryManager():
         conn.socket.close()
         self.current_connection = None
 
-    def send_request(self, **request_args):
-        conn = self.current_connection
-        if conn is None:
-            raise SHMWorkerNotConnected(MSG_NOT_CONNECTED)
-
-        data = json.dumps(request_args).encode('utf-8')
-        conn.socket.sendto(data, self.worker_socket_path)
-
-    def read_response(self, conn_id):
-        ''' read responses from the worker
-
-        It was designed to be blocking so that the shared memory could works
-        a bit more like the true memory.
-        '''
-
-        conn = self.current_connection
-        if conn is None:
-            raise SHMWorkerNotConnected(MSG_NOT_CONNECTED)
-
-        try:
-            data, address = conn.socket.recvfrom(UDP_BUFFER_SIZE)
-            data = json.loads(data.decode('utf-8'))
-            if not isinstance(data, dict):
-                raise ValueError
-
-            if not data.get('succeeded') and self.sensitive:
-                raise SharedMemoryError('SHM Request unsuccessful')
-
-            return data
-        except socket.timeout:
-            logger.error(MSG_TIMEOUT)
-            raise SHMResponseTimeout(MSG_TIMEOUT)
-        except (UnicodeDecodeError, ValueError):
-            logger.error(MSG_INVALID_DATA)
-            raise SharedMemoryError(MSG_INVALID_DATA)
-
-    def lock(self, key):
+    def lock_key(self, key, backlogging=True):
         ''' acquire the lock of a container
         '''
 
@@ -771,10 +919,11 @@ class SharedMemoryManager():
             conn_id=self.current_connection.conn_id,
             action=Actions.LOCK,
             key=key,
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def unlock(self, key):
+    def unlock_key(self, key, backlogging=True):
         ''' release the lock of a container
         '''
 
@@ -782,10 +931,11 @@ class SharedMemoryManager():
             conn_id=self.current_connection.conn_id,
             action=Actions.UNLOCK,
             key=key,
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def create_key(self, key, type_, value=None):
+    def create_key(self, key, type_, value=None, backlogging=True):
         ''' create a new container
 
         :param key: the container key
@@ -801,10 +951,11 @@ class SharedMemoryManager():
             key=key,
             type=type_,
             value=value,
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def set_value(self, key, value):
+    def set_value(self, key, value, backlogging=True):
         ''' change the value of a key
 
         allowed container types:
@@ -819,10 +970,11 @@ class SharedMemoryManager():
             action=Actions.SET,
             key=key,
             value=value,
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def add_value(self, key, value):
+    def add_value(self, key, value, backlogging=True):
         ''' add values into the container
 
         allowed container types:
@@ -839,21 +991,21 @@ class SharedMemoryManager():
             action=Actions.ADD,
             key=key,
             value=value,
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def remove_value(self, key, *values):
+    def remove_value(self, key, values, backlogging=True):
         ''' remove values from the container
 
         :param key: the container key
-        :param *values: a group of values that need be removed.
+        :param values: a group of values that need be removed.
 
-                        When the container type is SET or LIST, values is
-                        a group of value in the container.
-                        
-                        When the container type is DICT, values is a group
-                        of keys in the dict container.
+                       When the container type is SET or LIST, values is
+                       a group of value in the container.
 
+                       When the container type is DICT, values is a group
+                       of keys in the dict container.
         '''
 
         self.send_request(
@@ -861,21 +1013,24 @@ class SharedMemoryManager():
             action=Actions.REMOVE,
             key=key,
             value=list(values),
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def read_key(self, key):
+    def read_key(self, key, backlogging=True):
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.READ,
             key=key,
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def clean_key(self, key):
+    def clean_key(self, key, backlogging=True):
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.CLEAN,
             key=key,
+            backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)

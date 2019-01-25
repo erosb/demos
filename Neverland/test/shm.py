@@ -67,6 +67,8 @@ DATA = [
 worker_pid = None
 shm_mgr = None
 
+do_not_kill_shm_worker = False
+
 
 def launch_shm_worker():
     global worker_pid, shm_mgr
@@ -121,7 +123,7 @@ class SHMTest(unittest.TestCase):
             print(resp)
             self.assertTrue(resp.get('succeeded'))
 
-            resp = shm_mgr.remove_value(KEY, *td['2_remove'])
+            resp = shm_mgr.remove_value(KEY, td['2_remove'])
             print('\n-----------Remove-----------')
             print(resp)
             self.assertTrue(resp.get('succeeded'))
@@ -169,7 +171,8 @@ class SHMTest(unittest.TestCase):
         print('\n\n=====================key-error-test====================')
         resp = shm_mgr.add_value(
                    key='not_exists',
-                   value='a'
+                   value='a',
+                   backlogging=False,
                )
         print(resp)
         self.assertEqual(resp.get('succeeded'), False)
@@ -179,14 +182,15 @@ class SHMTest(unittest.TestCase):
         resp = shm_mgr.create_key(
                    'testing',
                    SHMContainerTypes.DICT,
-                   value='a'
+                   value='a',
+                   backlogging=False,
                )
         print(resp)
         self.assertEqual(resp.get('succeeded'), False)
         self.assertEqual(resp.get('rcode'), ReturnCodes.TYPE_ERROR)
 
         print('\n\n===================unlock-not-locked-test==================')
-        resp = shm_mgr.unlock('testing')
+        resp = shm_mgr.unlock_key('testing')
         print(resp)
         self.assertEqual(resp.get('succeeded'), True)
         self.assertEqual(resp.get('rcode'), ReturnCodes.NOT_LOCKED)
@@ -196,12 +200,13 @@ class SHMTest(unittest.TestCase):
         resp = shm_mgr.create_key(
                    'testing',
                    SHMContainerTypes.LIST,
+                   backlogging=False,
                )
         self.assertEqual(resp.get('succeeded'), True)
         self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
 
         print('------lock-container------')
-        resp = shm_mgr.lock('testing')
+        resp = shm_mgr.lock_key('testing')
         print(resp)
         self.assertEqual(resp.get('succeeded'), True)
         self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
@@ -209,25 +214,76 @@ class SHMTest(unittest.TestCase):
         print('------access-locked-container------')
         shm_mgr1 = SharedMemoryManager(config)
         shm_mgr1.connect('test_err_1')
-        resp = shm_mgr1.add_value('testing', [1, 2, 3])
+        resp = shm_mgr1.add_value(
+                   'testing',
+                   [1, 2, 3],
+                   backlogging=False,
+               )
         print(resp)
         self.assertEqual(resp.get('succeeded'), False)
         self.assertEqual(resp.get('rcode'), ReturnCodes.LOCKED)
 
         print('------unlock-container----------')
-        resp = shm_mgr.unlock('testing')
+        resp = shm_mgr.unlock_key('testing')
         print(resp)
         self.assertEqual(resp.get('succeeded'), True)
         self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
 
         print('------access-locked-container-again------')
-        resp = shm_mgr1.add_value('testing', [1, 2, 3])
+        resp = shm_mgr1.add_value(
+                   'testing',
+                   [1, 2, 3],
+                   backlogging=False,
+               )
         print(resp)
         self.assertEqual(resp.get('succeeded'), True)
         self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
 
         shm_mgr.disconnect()
         shm_mgr1.disconnect()
+
+    def test_999_backlog(self):
+        global do_not_kill_shm_worker
+
+        key = 'bl0'
+
+        shm_mgr = SharedMemoryManager(config)
+        shm_mgr.connect('test_bl')
+        shm_mgr.create_key(key, SHMContainerTypes.LIST)
+        shm_mgr.lock_key(key)
+
+        pid = os.fork()
+        if pid == -1:
+            raise OSError('fork failed')
+
+        if pid == 0:
+            # This socket will cause a warning, so we close it here
+            shm_mgr.current_connection.socket.close()
+
+            do_not_kill_shm_worker = True
+            shm_mgr1 = SharedMemoryManager(config)
+            shm_mgr1.connect('test_bl1')
+
+            print('\n\n==============access-locked-container===============')
+            t0 = time.time()
+            resp = shm_mgr1.read_key(key)
+            t1 = time.time()
+
+            print(resp)
+
+            delay = t1 - t0
+            print(f'delay: {delay}')
+
+            self.assertEqual(resp.get('succeeded'), True)
+            self.assertTrue(delay >= 1)
+
+            shm_mgr1.disconnect()
+        else:
+            time.sleep(1)
+            print('------------release-lock-------------')
+            shm_mgr.unlock_key(key)
+            shm_mgr.disconnect()
+            os.waitpid(-1, 0)
 
 
 if __name__ == '__main__':
@@ -238,4 +294,5 @@ if __name__ == '__main__':
         try:
             unittest.main()
         finally:
-            os.kill(worker_pid, sig.SIGTERM)
+            if not do_not_kill_shm_worker:
+                os.kill(worker_pid, sig.SIGTERM)

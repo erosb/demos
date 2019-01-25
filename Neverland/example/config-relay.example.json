@@ -1,5 +1,6 @@
 {
 	"basic": {
+		"node_id": 2,
 		"worker_amount": 2,
 		"pid_file": "/tmp/nl_master.pid"
 	},

@@ -8,7 +8,7 @@ import select
 import signal as sig
 import logging
 
-from neverland.excetions import (
+from neverland.exceptions import (
     FailedToJoinCluster,
     FailedToDetachFromCluster,
 )
@@ -33,6 +33,7 @@ from neverland.protocol.v0.fmt import (
     CtrlPktFormat,
     ConnCtrlPktFormat,
 )
+from neverland.components.idgeneration import IDGenerator
 from neverland.components.sharedmem import SharedMemoryManager
 
 
@@ -74,8 +75,11 @@ class BaseNode():
     def __init__(self, config, role=None):
         self.config = config
         self.role = role or self.role
+
         self.worker_pids = []
         self.shm_worker_pid = None
+
+        self.node_id = self.config.basic.node_id
 
     def _write_master_pid(self):
         pid_path = self.config.basic.pid_file
@@ -195,23 +199,6 @@ class BaseNode():
 
         logger.debug('Node daemonized')
 
-    def get_context():
-        return NodeContext
-
-    def _create_context(self):
-        NodeContext.core = self.core
-        NodeContext.pid = os.getpid()
-        NodeContext.local_ip = get_localhost_ip()
-
-        logger.debug('Node context created')
-
-    def _clean_context(self):
-        NodeContext.core = None
-        NodeContext.pid = None
-        NodeContext.local_ip = None
-
-        logger.debug('Node context cleaned')
-
     def _start_shm_mgr(self):
         self.shm_mgr = SharedMemoryManager(self.config)
 
@@ -278,7 +265,28 @@ class BaseNode():
         self.core.self_allocate_core_id()
         self.core.init_shm()
 
+        self.id_generator = IDGenerator(self.node_id, self.core.core_id)
+
         logger.debug('Additional init step for node modules done')
+
+    def get_context():
+        return NodeContext
+
+    def _create_context(self):
+        NodeContext.core = self.core
+        NodeContext.id_generator = self.id_generator
+        NodeContext.local_ip = get_localhost_ip()
+        NodeContext.pid = os.getpid()
+
+        logger.debug('Node context created')
+
+    def _clean_context(self):
+        NodeContext.core = None
+        NodeContext.id_generator = None
+        NodeContext.local_ip = None
+        NodeContext.pid = None
+
+        logger.debug('Node context cleaned')
 
     def join_cluster(self):
         epoll = select.epoll()
@@ -339,6 +347,7 @@ class BaseNode():
             self.join_cluster()
 
         self._clean_modules()
+        self._clean_context()
 
         # start normal workers
         worker_amount = self.config.basic.worker_amount

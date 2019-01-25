@@ -11,7 +11,7 @@ from neverland.components.sharedmem import SHMContainerTypes
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.exceptions import (
     ConfigError,
-    DropPakcet,
+    DropPacket,
     SharedMemoryError,
 )
 
@@ -160,7 +160,7 @@ class ControllerLogicHandler(BaseLogicHandler):
         elif pkt.fields.subject == ClusterControllingSubjects.READ_CLUSTER_CONFIG:
             return self.handle_0x11_reading_config(pkt)
         else:
-            raise DropPakcet
+            raise DropPacket
 
     def handle_0x01_join_cluster(self, pkt):
         ''' handle requests of joining cluster
