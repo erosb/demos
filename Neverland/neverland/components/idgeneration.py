@@ -87,33 +87,23 @@ class IDGenerator():
 
         return self.__sequence, self.__last_ts
 
-    def _to_base_2_string(self, num, length):
-        ''' convert numbers into base 2 format
-
-        Within the conversion, this function will also ensure the length of
-        the base-2 number. If it's too short, then zeros will be added at the
-        left side of base-2 formated numbers.
-        '''
-
-        b2 = '{0:b}'.format(num)
-        zero_amount = length - len(b2)
-
-        if zero_amount < 0:
-            raise RuntimeError('number overflows')
-
-        return '0' * zero_amount + b2
-
     def combine(self, ts, node_id, core_id, sequence):
         ''' combine the defined bit fields
         '''
 
-        b2 = ''.join((
-                 self._to_base_2_string(ts, self.TS_LENGTH),
-                 self._to_base_2_string(node_id, self.NODE_ID_LENGTH),
-                 self._to_base_2_string(core_id, self.CORE_ID_LENGTH),
-                 self._to_base_2_string(sequence, self.SEQUANCE_LENGTH),
-             ))
-        return int(b2, 2)
+        displacement_ts = (
+            self.NODE_ID_LENGTH +
+            self.CORE_ID_LENGTH +
+            self.SEQUANCE_LENGTH
+        )
+        displacement_node_id = self.CORE_ID_LENGTH + self.SEQUANCE_LENGTH
+        displacement_core_id = self.SEQUANCE_LENGTH
+
+        ts = ts * (2 ** displacement_ts)
+        node_id = node_id * (2 ** displacement_node_id)
+        core_id = core_id * (2 ** displacement_core_id)
+
+        return ts + node_id + core_id + sequence
 
     def gen(self):
         ''' generate the ID
