@@ -138,12 +138,6 @@ class BaseCore():
                 f'deadlock of key: {self.SHM_KEY_CORE_ID}'
             )
 
-        if not resp.get('succeeded'):
-            rcode = resp.get('rcode')
-            raise SharedMemoryError(
-                f'SHM error with rcode: {hex_rcode}'
-            )
-
         resp = self.shm_mgr.read_key(self.SHM_KEY_CORE_ID)
         allocated_id = resp.get('value')
 

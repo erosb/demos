@@ -78,6 +78,9 @@ The protocol of communication:
         value:
             value of container
 
+        value_key:
+            the key of a value in a container
+
         backlogging:
             backlog the request if the container is locked, if backlogging
             is not enabled, then the server side shall respond immediately
@@ -116,6 +119,15 @@ The protocol of communication:
                 "action": int,
                 "key": str,
                 "value": same with the container type,
+                "backlogging": bool,
+            }
+
+        if action in [GET]:
+            {
+                "conn_id": str,
+                "action": int,
+                "key": str,
+                "value_key": any serializable type in json,
                 "backlogging": bool,
             }
 
@@ -176,7 +188,7 @@ logger = logging.getLogger('SHM')
 
 
 POLL_TIMEOUT = 1
-UDP_BUFFER_SIZE = 65535
+UDP_BUFFER_SIZE = 65507
 
 # The max blocing time at the client side of the SharedMemoryManager
 SHM_MAX_BLOCKING_TIME = 4
@@ -193,6 +205,9 @@ class Actions(metaclass=MetaEnum):
     CREATE = 0x01
 
     # read value from a key
+    # this action will cause the shared memory manager respond with
+    # whole value in the accessing container. If the value's length is
+    # greater than 65507 then there will be some exceptions
     READ = 0x02
 
     # change value of a key
@@ -200,6 +215,10 @@ class Actions(metaclass=MetaEnum):
 
     # add a new value into a multi-value container
     ADD = 0x04
+
+    # get a single value from a multi-value container
+    # currently, it only supports dict container
+    GET = 0x05
 
     # completely remove a key from stored resources
     CLEAN = 0x11
@@ -307,7 +326,7 @@ class SharedMemoryManager():
 
     EV_MASK = select.EPOLLIN
 
-    def __init__(self, config, sensitive=False):
+    def __init__(self, config, sensitive=True):
         ''' Constructor
 
         :param config: the config
@@ -599,6 +618,32 @@ class SharedMemoryManager():
         except ValueError:
             return self._gen_response_json(conn_id=conn_id, succeeded=False)
 
+    def handle_get(self, data):
+        key = data.key
+        value_key = data.value_key
+        conn_id = data.conn_id
+
+        if key not in self.resources:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
+
+        container = self.get_compatible_value(key)
+        if not isinstance(container, dict):
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.TYPE_ERROR,
+            )
+
+        return self._gen_response_json(
+            conn_id=conn_id,
+            succeeded=True,
+            value=container.get(value_key),
+        )
+
     def handle_clean(self, data):
         key = data.key
         value = data.value
@@ -706,6 +751,8 @@ class SharedMemoryManager():
             return self.handle_set(data)
         if data.action == Actions.ADD:
             return self.handle_add(data)
+        if data.action == Actions.GET:
+            return self.handle_get(data)
         if data.action == Actions.CLEAN:
             return self.handle_clean(data)
         if data.action == Actions.REMOVE:
@@ -848,7 +895,10 @@ class SharedMemoryManager():
                 raise ValueError
 
             if not data.get('succeeded') and self.sensitive:
-                raise SharedMemoryError('SHM Request unsuccessful')
+                formated_data = json.dumps(data, indent=4)
+                raise SharedMemoryError(
+                    f'SHM Request unsuccessful, response: \n{formated_data}\n'
+                )
 
             return data
         except socket.timeout:
@@ -869,8 +919,8 @@ class SharedMemoryManager():
         sock.settimeout(SHM_MAX_BLOCKING_TIME)
 
         data = {
-            "socket": socket_name,
-            "action": Actions.CONNECT,
+            'socket': socket_name,
+            'action': Actions.CONNECT,
         }
         data = json.dumps(data).encode('utf-8')
         sock.sendto(data, self.worker_socket_path)
@@ -992,6 +1042,24 @@ class SharedMemoryManager():
             action=Actions.ADD,
             key=key,
             value=value,
+            backlogging=backlogging,
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def get_value(self, key, value_key, backlogging=True):
+        ''' get a single value from a the container
+
+        allowed container type: DICT
+
+        :param key: the container key
+        :param value_key: the key of a value in a container
+        '''
+
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.GET,
+            key=key,
+            value_key=value_key,
             backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)

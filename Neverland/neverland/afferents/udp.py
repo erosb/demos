@@ -7,7 +7,7 @@ import struct
 from neverland.pkt import UDPPacket
 
 
-UDP_BUFFER_SIZE = 65535
+UDP_BUFFER_SIZE = 65507
 
 
 class UDPReceiver():

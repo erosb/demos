@@ -1,6 +1,8 @@
 #!/usr/bin/python3.6
 #coding: utf-8
 
+from neverland.pkt import UDPPacket
+from neverland.exceptions import InvalidPkt
 from neverland.node.context import NodeContext
 from neverland.components.sharedmem import (
     SharedMemoryManager,
@@ -16,9 +18,10 @@ class SpecialPacketManager():
     # data structure:
     #     {
     #         id: {
+    #             type: int,
     #             fields: {}
-    #             src: [ip, port],
-    #             dest: [ip, port],
+    #             previous_hop: [ip, port],
+    #             next_hop: [ip, port],
     #         }
     #     }
     SHM_KEY_PKTS = 'SpecPktMgr_Packets'
@@ -39,14 +42,41 @@ class SpecialPacketManager():
             SHMContainerTypes.DICT,
         )
 
-    def _store_pkt_to_shm(self, dict_pkt):
-        self.shm_mgr.lock(self.SHM_KEY_PKTS)
-
-    def _get_pkt_from_shm(self, pkt_id):
-        pass
-
     def store_pkt(self, pkt):
-        pass
+        id_ = pkt.fields.serial
+        type_ = pkt.type
+        fields = pkt.fields.__to_dict__()
+        previous_hop = list(pkt.previous_hop)
+        next_hop = list(pkt.next_hop)
+
+        if id_ is None:
+            raise InvalidPkt(
+                'Packets to be stored must contain a serial number'
+            )
+
+        value = {
+            id_: {
+                'type': type_
+                'fields': fields,
+                'previous_hop': previous_hop,
+                'next_hop': next_hop,
+            }
+        }
+
+        self.shm_mgr.lock_key(self.SHM_KEY_PKTS)
+        self.shm_mgr.add_value(self.SHM_KEY_PKTS, value)
+        self.shm_mgr.unlock_key(self.SHM_KEY_PKTS)
 
     def get_pkt(self, pkt_id):
-        pass
+        shm_data = self.shm_mgr.get_value(self.SHM_KEY_PKTS, pkt_id)
+        value = shm_data.get('value')
+
+        if shm_value is None:
+            return None
+
+        return UDPPacket(
+                   type=value.get('type'),
+                   fields=value.get('fields'),
+                   previous_hop=value.get('previous_hop'),
+                   next_hop=value.get('next_hop'),
+               )

@@ -12,7 +12,7 @@ from neverland.protocol.base import (
 )
 
 
-UDP_DATA_LEN = 65535
+UDP_DATA_MAX_LEN = 65507
 
 
 '''
@@ -113,7 +113,7 @@ class DataPktFormat(BasePktFormat):
         cls.__fmt__ = {
             # just the data
             'data': FieldDefinition(
-                        length = UDP_DATA_LEN,
+                        length = UDP_DATA_MAX_LEN,
                         type   = FieldTypes.PY_BYTES,
                     ),
         }
@@ -140,7 +140,7 @@ class CtrlPktFormat(BasePktFormat):
             # contains arguments for the selected subject.
             # The format of content field is stringified JSON.
             'content': FieldDefinition(
-                           length = UDP_DATA_LEN,
+                           length = UDP_DATA_MAX_LEN,
                            type   = FieldTypes.PY_DICT,
                        ),
         }
