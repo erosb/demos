@@ -22,7 +22,6 @@ class UDPReceiver():
         self.listen_port = listen_port or self.config.net.aff_listen_port
 
         self._sock = self.create_socket()
-        self.setsockopt(self._sock)
         self._fd = self._sock.fileno()
 
     def create_socket(self):
@@ -31,8 +30,9 @@ class UDPReceiver():
                                           port=self.listen_port,
                                           proto=socket.SOL_UDP,
                                       )[0]
-
         sock = socket.socket(af, type_, proto)
+
+        self.setsockopt(self._sock)
         sock.setblocking(False)
         return sock
 

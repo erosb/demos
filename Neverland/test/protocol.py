@@ -13,6 +13,12 @@ from neverland.protocol.v0.fmt import (
     CtrlPktFormat,
     ConnCtrlPktFormat,
 )
+from neverland.node.context import NodeContext
+from neverland.components.idgeneration import IDGenerator
+
+
+id_generator = IDGenerator(1, 1)
+NodeContext.id_generator = id_generator
 
 
 json_config = {

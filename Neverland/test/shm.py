@@ -80,7 +80,7 @@ def launch_shm_worker():
 
     # run SHM worker in the child process
     elif pid == 0:
-        shm_mgr = SharedMemoryManager(config, sensitive=True)
+        shm_mgr = SharedMemoryManager(config)
         shm_mgr.run_as_worker()
 
     # send testing request in the parent process
@@ -96,7 +96,7 @@ def launch_shm_worker():
 class SHMTest(unittest.TestCase):
 
     def test_0_normal_ops(self):
-        shm_mgr = SharedMemoryManager(config)
+        shm_mgr = SharedMemoryManager(config, sensitive=False)
         shm_mgr.connect('test')
         print('conn_id: ', shm_mgr.current_connection.conn_id)
         self.assertIsInstance(shm_mgr.current_connection.conn_id, str)
@@ -145,7 +145,7 @@ class SHMTest(unittest.TestCase):
         VALUE_FOR_SET = 'aaaaaaaaaaaaa'
 
         print('\n\n=====================set-value====================')
-        shm_mgr = SharedMemoryManager(config)
+        shm_mgr = SharedMemoryManager(config, sensitive=False)
         shm_mgr.connect('test_set')
         print('conn_id: ', shm_mgr.current_connection.conn_id)
         self.assertIsInstance(shm_mgr.current_connection.conn_id, str)
@@ -165,7 +165,7 @@ class SHMTest(unittest.TestCase):
         self.assertEqual(shm_mgr.current_connection, None)
 
     def test_2_rcode(self):
-        shm_mgr = SharedMemoryManager(config)
+        shm_mgr = SharedMemoryManager(config, sensitive=False)
         shm_mgr.connect('test_err')
 
         print('\n\n=====================key-error-test====================')
@@ -212,7 +212,7 @@ class SHMTest(unittest.TestCase):
         self.assertEqual(resp.get('rcode'), ReturnCodes.OK)
 
         print('------access-locked-container------')
-        shm_mgr1 = SharedMemoryManager(config)
+        shm_mgr1 = SharedMemoryManager(config, sensitive=False)
         shm_mgr1.connect('test_err_1')
         resp = shm_mgr1.add_value(
                    'testing',
@@ -247,7 +247,7 @@ class SHMTest(unittest.TestCase):
 
         key = 'bl0'
 
-        shm_mgr = SharedMemoryManager(config)
+        shm_mgr = SharedMemoryManager(config, sensitive=False)
         shm_mgr.connect('test_bl')
         shm_mgr.create_key(key, SHMContainerTypes.LIST)
         shm_mgr.lock_key(key)
@@ -261,7 +261,7 @@ class SHMTest(unittest.TestCase):
             shm_mgr.current_connection.socket.close()
 
             do_not_kill_shm_worker = True
-            shm_mgr1 = SharedMemoryManager(config)
+            shm_mgr1 = SharedMemoryManager(config, sensitive=False)
             shm_mgr1.connect('test_bl1')
 
             print('\n\n==============access-locked-container===============')

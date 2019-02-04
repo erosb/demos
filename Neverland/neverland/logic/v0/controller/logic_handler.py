@@ -192,7 +192,7 @@ class ControllerLogicHandler(BaseLogicHandler):
 
         content = {
             'identification': self.identification,
-            'responding_serial': pkt.fields.serial,
+            'responding_sn': pkt.fields.sn,
             'body': {
                 'permitted': permitted,
             }
@@ -215,7 +215,7 @@ class ControllerLogicHandler(BaseLogicHandler):
 
         content = {
             'identification': self.identification,
-            'responding_serial': pkt.fields.serial,
+            'responding_sn': pkt.fields.sn,
             'body': {
                 'permitted': permitted,
             }

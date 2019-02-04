@@ -368,7 +368,7 @@ class SharedMemoryManager():
         self.backlogged_requests = {}
 
         # serial number counter for backlogged_requests
-        self.backlog_serial = 0
+        self.backlog_sn = 0
 
     def _create_socket(self, socket_path=None, blocking=False):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
@@ -389,9 +389,9 @@ class SharedMemoryManager():
     def gen_conn_id(self):
         return gen_uuid()
 
-    def gen_backlog_serial(self):
-        self.backlog_serial += 1
-        return self.backlog_serial
+    def gen_backlog_sn(self):
+        self.backlog_sn += 1
+        return self.backlog_sn
 
     def get_compatible_value(self, key):
         ''' make the value type become compatible with json
@@ -727,9 +727,9 @@ class SharedMemoryManager():
             self.prehandle_lock(data)
         except SHMContainerLocked:
             if backlogging:
-                serial = self.gen_backlog_serial()
+                sn = self.gen_backlog_sn()
                 self.backlogged_requests.update(
-                    {serial: data}
+                    {sn: data}
                 )
                 backlog_count = len(self.backlogged_requests)
                 logger.debug(
@@ -766,10 +766,10 @@ class SharedMemoryManager():
         if data.action == Actions.DISCONNECT:
             return self.handle_disconnect(data)
 
-    def handle_backlogged_request(self, bl_serial, data):
+    def handle_backlogged_request(self, bl_sn, data):
         ''' handle the backlogged request
 
-        :param bl_serial: serial number of backlogged request
+        :param bl_sn: serial number of backlogged request
         :param data: data of the request
         '''
 
@@ -782,10 +782,10 @@ class SharedMemoryManager():
         if not succeeded and rcode == ReturnCodes.LOCKED:
             raise SHMContainerLocked('Container still locked')
         else:
-            self.backlogged_requests.pop(bl_serial, None)
+            self.backlogged_requests.pop(bl_sn, None)
             remaining_bl = len(self.backlogged_requests)
             logger.debug(
-                f'backlogged request <{bl_serial}> processed, '
+                f'backlogged request <{bl_sn}> processed, '
                 f'remaining: {remaining_bl}'
             )
             return resp
@@ -845,13 +845,13 @@ class SharedMemoryManager():
             # we will change self.backlogged_requests during the iteration
             dup = dict(self.backlogged_requests)
 
-            for bl_serial, data in dup.items():
+            for bl_sn, data in dup.items():
                 try:
-                    resp = self.handle_backlogged_request(bl_serial, data)
+                    resp = self.handle_backlogged_request(bl_sn, data)
                     self.handle_responding(resp)
                 except SHMContainerLocked:
                     logger.debug(
-                        f'backlogged request <{bl_serial}> still locked'
+                        f'backlogged request <{bl_sn}> still locked'
                     )
                 except (DropPacket, SHMRequestBacklogged):
                     pass

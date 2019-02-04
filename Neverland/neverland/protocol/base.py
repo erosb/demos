@@ -111,8 +111,8 @@ class ComplexedFormat(BasePktFormat):
         self.__fmt__.update(fmt_cls.__fmt__)
 
 
-def serial_calculator(pkt, header_fmt, body_fmt):
-    ''' calculator for the serial field
+def sn_calculator(pkt, header_fmt, body_fmt):
+    ''' calculator for the serial number field
     '''
 
     id_generator = NodeContext.id_generator
@@ -277,15 +277,18 @@ class BaseProtocolWrapper():
             pkt.byte_fields.__update__(**{field_name: fragment})
 
         for field_name, definition in fmt.__calc_definition__.items():
-            value = definition.calculator(pkt, self.header_fmt, body_fmt)
-            if value is None:
-                raise PktWrappingError(
-                    f'Field {field_name}; calculator {calculator} doesn\'t '
-                    f'return a valid value'
-                )
+            value = getattr(pkt.fields, field_name)
 
-            fragment = self._pack_field(value, definition.type)
-            pkt.byte_fields.__update__(**{field_name: fragment})
+            if value is None:
+                value = definition.calculator(pkt, self.header_fmt, body_fmt)
+                if value is None:
+                    raise PktWrappingError(
+                        f'Field {field_name}: calculator {calculator} doesn\'t '
+                        f'return a valid value'
+                    )
+
+                fragment = self._pack_field(value, definition.type)
+                pkt.byte_fields.__update__(**{field_name: fragment})
 
         # Finally, all fields are ready. Now we can combine them into udp_data
         for field_name, definition in fmt.__fmt__.items():

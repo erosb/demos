@@ -67,7 +67,7 @@ class ClusterControllingSubjects(metaclass=MetaEnum):
     #
     # Required content: {
     #                       "identification": str,
-    #                       "responding_serial": int,
+    #                       "responding_sn": int,
     #                       "body": JSON,
     #                   }
     RESPONSE = 0xff
