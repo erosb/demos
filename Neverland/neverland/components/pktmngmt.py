@@ -9,12 +9,16 @@ import signal as sig
 import logging
 
 from neverland.pkt import UDPPacket
+from neverland.utils import Converter
 from neverland.exceptions import InvalidPkt, SharedMemoryError
 from neverland.node.context import NodeContext
 from neverland.components.sharedmem import (
     SharedMemoryManager,
     SHMContainerTypes,
 )
+
+
+logger = logging.getLogger('PktMgr')
 
 
 # SHM container for storing special packets
@@ -115,7 +119,7 @@ class SpecialPacketManager():
 
     def store_pkt(self, pkt, need_repeat=False, max_rpt_times=5):
         sn = pkt.fields.sn
-        type_ = pkt.type
+        type_ = pkt.fields.type
         fields = pkt.fields.__to_dict__()
         previous_hop = list(pkt.previous_hop)
         next_hop = list(pkt.next_hop)
@@ -127,7 +131,7 @@ class SpecialPacketManager():
 
         value = {
             sn: {
-                'type': type_
+                'type': type_,
                 'fields': fields,
                 'previous_hop': previous_hop,
                 'next_hop': next_hop,
@@ -141,6 +145,12 @@ class SpecialPacketManager():
         if need_repeat:
             self.shm_mgr.add_value(self.shm_key_pkts_to_repeat, [sn])
             self.set_pkt_max_repeat_times(sn, max_rpt_times)
+
+        hex_type = Converter.int_2_hex(type_)
+        logger.debug(
+            f'Stored a special packet, need_repeat: {need_repeat}'
+            f'sn: {sn}, type: {hex_type}, dest: {pkt.fields.dest}'
+        )
 
     def get_pkt(self, sn):
         shm_data = self.shm_mgr.get_value(self.shm_key_pkts, sn)
@@ -163,6 +173,10 @@ class SpecialPacketManager():
         self.shm_mgr.remove_value(self.shm_key_pkts, sn)
         self.shm_mgr.unlock_key(self.shm_key_pkts)
 
+        logger.debug(
+            f'Removed a special packet, sn: {sn}'
+        )
+
     def cancel_repeat(self, sn):
         self.shm_mgr.remove_value(self.shm_key_pkts_to_repeat, sn)
         self.shm_mgr.remove_value(self.shm_key_last_repeat_time, sn)
@@ -179,6 +193,7 @@ class SpecialPacketManager():
 
     def set_pkt_last_repeat_time(self, sn, timestamp):
         self.shm_mgr.add_value(self.shm_key_last_repeat_time, {sn: timestamp})
+        logger.debug(f'set_pkt_last_repeat_time, sn: {sn}, ts: {timestamp}')
 
     def get_pkt_last_repeat_time(self, sn):
         shm_data = self.shm_mgr.get_value(self.shm_key_last_repeat_time, sn)
@@ -186,6 +201,7 @@ class SpecialPacketManager():
 
     def set_pkt_next_repeat_time(self, sn, timestamp):
         self.shm_mgr.add_value(self.shm_key_next_repeat_time, {sn: timestamp})
+        logger.debug(f'set_pkt_next_repeat_time, sn: {sn}, ts: {timestamp}')
 
     def get_pkt_next_repeat_time(self, sn):
         shm_data = self.shm_mgr.get_value(self.shm_key_next_repeat_time, sn)
@@ -193,6 +209,7 @@ class SpecialPacketManager():
 
     def set_pkt_max_repeat_times(self, sn, times):
         self.shm_mgr.add_value(self.shm_key_max_repeat_times, {sn: times})
+        logger.debug(f'set_pkt_max_repeat_times, sn: {sn}, times: {times}')
 
     def get_pkt_max_repeat_times(self, sn):
         shm_data = self.shm_mgr.get_value(self.shm_key_max_repeat_times, sn)
@@ -200,6 +217,7 @@ class SpecialPacketManager():
 
     def set_pkt_repeated_times(self, sn, times):
         self.shm_mgr.add_value(self.shm_key_repeated_times, {sn: times})
+        logger.debug(f'set_pkt_repeated_times, sn: {sn}, times: {times}')
 
     def get_pkt_repeated_times(self, sn):
         shm_data = self.shm_mgr.get_value(self.shm_key_repeated_times, sn)
@@ -252,9 +270,10 @@ class SpecialPacketRepeater():
             )
 
         try:
+            logger.info(f'killing SpecialPacketRepeater process {pid}')
             os.kill(pid, sig.SIGTERM)
         except ProcessLookupError:
-            pass
+            logger.info(f'SpecialPacketRepeater process {pid} does not exists')
 
     def gen_interval(self):
         return random.uniform(*self.interval_args)
@@ -272,7 +291,16 @@ class SpecialPacketRepeater():
         self.pkt_mgr.set_pkt_next_repeat_time(sn, next_rpt_ts)
         self.pkt_mgr.increase_pkt_repeated_times(sn)
 
+        type_ = Converter.int_2_hex(pkt.fields.type)
+        logger.debug(
+            f'Repeated a special packet, sn: {pkt.fields.sn}, '
+            f'type: {type_}, dest: {pkt.fields.dest}'
+        )
+
     def run(self):
+        pid = os.getpid()
+        logger.info(f'starting SpecialPacketRepeater worker {pid}')
+
         self.__running = True
 
         while self.__running:
@@ -308,4 +336,8 @@ class SpecialPacketRepeater():
                 else:
                     self.repeat(sn, pkt, current_ts)
 
-            time.sleep(interval_to_next_poll)
+            s = interval_to_next_poll   # too long ...
+            logger.debug('SpecialPacketRepeater is going to sleep {s} sec.')
+            time.sleep(s)
+
+        logger.info(f'SpecialPacketRepeater worker {pid} exits')

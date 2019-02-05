@@ -117,9 +117,10 @@ class HashTools():
 class Converter():
 
     @classmethod
-    def int_2_hex(cls, num, lower_case=False):
+    def int_2_hex(cls, num, lower_case=True):
         s = '{0:x}' if lower_case else '{0:X}'
-        return s.format(num)
+        hex_number = s.format(num)
+        return f'0x{hex_number}'
 
 
 class _BaseEnum():
