@@ -22,12 +22,10 @@ class UDPTransmitter():
             self._sock = self.create_socket()
 
     def create_socket(self, bind_port=None):
-        port = bind_port or self.config.net.aff_listen_port
-
         # TODO ipv6 support
         af, type_, proto, canon, sa = socket.getaddrinfo(
                                           host='0.0.0.0',
-                                          port=port,
+                                          port=bind_port or 0,
                                           proto=socket.SOL_UDP,
                                       )[0]
         sock = socket.socket(af, type_, proto)

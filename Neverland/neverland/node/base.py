@@ -35,6 +35,10 @@ from neverland.protocol.v0.fmt import (
 )
 from neverland.components.idgeneration import IDGenerator
 from neverland.components.sharedmem import SharedMemoryManager
+from neverland.components.pktmngmt import (
+    SpecialPacketManager,
+    SpecialPacketRepeater,
+)
 
 
 logger = logging.getLogger('Node')
@@ -78,6 +82,7 @@ class BaseNode():
 
         self.worker_pids = []
         self.shm_worker_pid = None
+        self.pkt_rpter_worker_pid = None
 
         self.node_id = self.config.basic.node_id
 
@@ -115,6 +120,12 @@ class BaseNode():
         logger.debug(f'Shutting down SharedMemoryManager {pid}')
         self.shm_mgr.shutdown_worker()
 
+    def _handle_term_pkt_rpter(self, signal, sf):
+        pid = os.getpid()
+        logger.debug(f'SpecialPacketRepeater {pid} received signal: {signal}')
+        logger.debug(f'Shutting down SpecialPacketRepeater {pid}')
+        self.pkt_rpter.shutdown()
+
     def _sig_master(self):
         sig.signal(sig.SIGHUP, sig.SIG_IGN)
         for s in TERM_SIGNALS:
@@ -129,6 +140,11 @@ class BaseNode():
         sig.signal(sig.SIGHUP, sig.SIG_IGN)
         for s in TERM_SIGNALS:
             sig.signal(s, self._handle_term_shm)
+
+    def _sig_pkt_rpter_worker(self):
+        sig.signal(sig.SIGHUP, sig.SIG_IGN)
+        for s in TERM_SIGNALS:
+            sig.signal(s, self._handle_term_pkt_rpter)
 
     def shutdown_workers(self):
         for pid in self.worker_pids:
@@ -208,12 +224,25 @@ class BaseNode():
             raise OSError('fork failed')
         elif pid == 0:
             self._sig_shm_worker()
-            self._load_shm_mgr()
             self.shm_mgr.run_as_worker()
             return  # the sub-process ends here
         else:
             self.shm_worker_pid = pid
             logger.info(f'Started SharedMemoryManager: {pid}')
+
+    def _start_pkt_rpter(self):
+        self.pkt_rpter = SpecialPacketRepeater(self.config)
+
+        pid = os.fork()
+        if pid == -1:
+            raise OSError('fork failed')
+        elif pid == 0:
+            self._sig_pkt_rpter_worker()
+            self.pkt_rpter.run()
+            return  # the sub-process ends here
+        else:
+            self.pkt_rpter_worker_pid = pid
+            logger.info(f'Started SpecialPacketRepeater: {pid}')
 
     def _load_modules(self):
         self.afferent_cls = AFFERENT_MAPPING[self.role]
@@ -242,17 +271,28 @@ class BaseNode():
                         protocol_wrapper=self.protocol_wrapper,
                     )
 
+        self.pkt_mgr = SpecialPacketManager(self.config)
+
+        # The packet repeater is a part of the packet manager, so we will
+        # use it as a normal module. Each worker shall have it's own packet
+        # repeater but not share it like the shared memory manager worker
+        self._start_pkt_rpter()
+
         logger.debug('Node modules loaded')
 
     def _clean_modules(self):
         self.core.shutdown()
         self.main_afferent.destroy()
+        self.pkt_rpter.shutdown()
 
         self.main_afferent = None
         self.efferent = None
         self.protocol_wrapper = None
         self.logic_handler = None
         self.core = None
+        self.pkt_mgr = None
+        self.pkt_rpter = None
+        self.pkt_rpter_worker_pid = None
 
         logger.debug('Node modules cleaned')
 
@@ -267,24 +307,32 @@ class BaseNode():
 
         self.id_generator = IDGenerator(self.node_id, self.core.core_id)
 
+        self.pkt_mgr.init_shm()
+
         logger.debug('Additional init step for node modules done')
 
     def get_context():
         return NodeContext
 
     def _create_context(self):
-        NodeContext.core = self.core
+        NodeContext.pid = os.getpid()
+        NodeContext.pkt_rpter_pid = self.pkt_rpter_worker_pid
         NodeContext.id_generator = self.id_generator
         NodeContext.local_ip = get_localhost_ip()
-        NodeContext.pid = os.getpid()
+        NodeContext.core = self.core
+        NodeContext.main_efferent = self.efferent
+        NodeContext.protocol_wrapper = self.protocol_wrapper
 
         logger.debug('Node context created')
 
     def _clean_context(self):
-        NodeContext.core = None
+        NodeContext.pid = None
+        NodeContext.pkt_rpter_pid = None
         NodeContext.id_generator = None
         NodeContext.local_ip = None
-        NodeContext.pid = None
+        NodeContext.core = None
+        NodeContext.main_efferent = None
+        NodeContext.protocol_wrapper = None
 
         logger.debug('Node context cleaned')
 

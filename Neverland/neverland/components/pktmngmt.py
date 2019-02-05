@@ -5,6 +5,7 @@ import os
 import time
 import random
 import socket
+import signal as sig
 import logging
 
 from neverland.pkt import UDPPacket
@@ -28,29 +29,37 @@ from neverland.components.sharedmem import (
 #     }
 SHM_KEY_PKTS = 'SpecPktMgr_Packets'
 
+
+# The following SHM_KEY_TMP_* consts are used as string tamplates,
+# an argument "pid" shall be passed to render templates into SHM keys
+#
+# Because of the SpecialPacketRepeater is not a shared worker, each forked node
+# worker shall have its own packet repeater, so we need to distinguish the
+# SHM container by the pid.
+
 # SHM container for storing serial numbers of packets that need
 # to be sent repeatedly
 # data structure:
 #     [sn_0, sn_1]
-SHM_KEY_PKTS_TO_REPEAT = 'SpecPktMgr_PacketsToRepeat'
+SHM_KEY_TMP_PKTS_TO_REPEAT = 'SpecPktRpter-%(pid)d_PacketsToRepeat'
 
 # SHM container for storing the last repeat time of packets
 # data structure:
 #     {sn: timestamp}
-SHM_KEY_LAST_REPEAT_TIME = 'SpecialPktRpter_LastRptTime'
+SHM_KEY_TMP_LAST_REPEAT_TIME = 'SpecialPktRpter-%(pid)d_LastRptTime'
 
-# similar with the above, but contains the timestamp of the next repeat time
-SHM_KEY_NEXT_REPEAT_TIME = 'SpecialPktRpter_NextRptTime'
+# similar with the above one, but contains the timestamp of the next repeat time
+SHM_KEY_TMP_NEXT_REPEAT_TIME = 'SpecialPktRpter-%(pid)d_NextRptTime'
 
 # SHM container for storing how many times packets could be repeated
 # data structure:
 #     {sn: integer}
-SHM_KEY_MAX_REPEAT_TIMES = 'SpecialPktRpter_MaxRepeatTimes'
+SHM_KEY_TMP_MAX_REPEAT_TIMES = 'SpecialPktRpter-%(pid)d_MaxRepeatTimes'
 
 # SHM container for storing how many times packets have been repeated
 # data structure:
 #     {sn: integer}
-SHM_KEY_REPEATED_TIMES = 'SpecialPktRpter_RepeatedTimes'
+SHM_KEY_TMP_REPEATED_TIMES = 'SpecialPktRpter-%(pid)d_RepeatedTimes'
 
 
 class SpecialPacketManager():
@@ -59,6 +68,17 @@ class SpecialPacketManager():
 
     def __init__(self, config):
         self.config = config
+        self.pid = os.getpid()
+
+        self.shm_key_pkts = SHM_KEY_PKTS
+
+        # These containers are for the SpecialPacketRepeater, the repeater
+        # will also access special packets by the manager.
+        self.shm_key_pkts_to_repeat = SHM_KEY_TMP_PKTS_TO_REPEAT % self.pid
+        self.shm_key_last_repeat_time = SHM_KEY_TMP_LAST_REPEAT_TIME % self.pid
+        self.shm_key_next_repeat_time = SHM_KEY_TMP_NEXT_REPEAT_TIME % self.pid
+        self.shm_key_max_repeat_times = SHM_KEY_TMP_MAX_REPEAT_TIMES % self.pid
+        self.shm_key_repeated_times = SHM_KEY_TMP_REPEATED_TIMES % self.pid
 
     def init_shm(self):
         ''' initialize the shared memory manager
@@ -69,27 +89,27 @@ class SpecialPacketManager():
             self.SHM_SOCKET_NAME_TEMPLATE % os.getpid()
         )
         self.shm_mgr.create_key(
-            SHM_KEY_PKTS,
+            self.shm_key_pkts,
             SHMContainerTypes.DICT,
         )
         self.shm_mgr.create_key(
-            SHM_KEY_PKTS_TO_REPEAT,
+            self.shm_key_pkts_to_repeat,
             SHMContainerTypes.LIST,
         )
         self.shm_mgr.create_key(
-            SHM_KEY_LAST_REPEAT_TIME,
+            self.shm_key_last_repeat_time,
             SHMContainerTypes.DICT,
         )
         self.shm_mgr.create_key(
-            SHM_KEY_NEXT_REPEAT_TIME,
+            self.shm_key_next_repeat_time,
             SHMContainerTypes.DICT,
         )
         self.shm_mgr.create_key(
-            SHM_KEY_MAX_REPEAT_TIMES,
+            self.shm_key_max_repeat_times,
             SHMContainerTypes.DICT,
         )
         self.shm_mgr.create_key(
-            SHM_KEY_REPEATED_TIMES,
+            self.shm_key_repeated_times,
             SHMContainerTypes.DICT,
         )
 
@@ -114,16 +134,16 @@ class SpecialPacketManager():
             }
         }
 
-        self.shm_mgr.lock_key(SHM_KEY_PKTS)
-        self.shm_mgr.add_value(SHM_KEY_PKTS, value)
-        self.shm_mgr.unlock_key(SHM_KEY_PKTS)
+        self.shm_mgr.lock_key(self.shm_key_pkts)
+        self.shm_mgr.add_value(self.shm_key_pkts, value)
+        self.shm_mgr.unlock_key(self.shm_key_pkts)
 
         if need_repeat:
-            self.shm_mgr.add_value(SHM_KEY_PKTS_TO_REPEAT, [sn])
+            self.shm_mgr.add_value(self.shm_key_pkts_to_repeat, [sn])
             self.set_pkt_max_repeat_times(sn, max_rpt_times)
 
     def get_pkt(self, sn):
-        shm_data = self.shm_mgr.get_value(SHM_KEY_PKTS, sn)
+        shm_data = self.shm_mgr.get_value(self.shm_key_pkts, sn)
         value = shm_data.get('value')
 
         if shm_value is None:
@@ -139,50 +159,50 @@ class SpecialPacketManager():
     def remove_pkt(self, sn):
         self.cancel_repeat(sn)
 
-        self.shm_mgr.lock_key(SHM_KEY_PKTS)
-        self.shm_mgr.remove_value(SHM_KEY_PKTS, sn)
-        self.shm_mgr.unlock_key(SHM_KEY_PKTS)
+        self.shm_mgr.lock_key(self.shm_key_pkts)
+        self.shm_mgr.remove_value(self.shm_key_pkts, sn)
+        self.shm_mgr.unlock_key(self.shm_key_pkts)
 
     def cancel_repeat(self, sn):
-        self.shm_mgr.remove_value(SHM_KEY_PKTS_TO_REPEAT, sn)
-        self.shm_mgr.remove_value(SHM_KEY_LAST_REPEAT_TIME, sn)
-        self.shm_mgr.remove_value(SHM_KEY_NEXT_REPEAT_TIME, sn)
-        self.shm_mgr.remove_value(SHM_KEY_MAX_REPEAT_TIMES, sn)
-        self.shm_mgr.remove_value(SHM_KEY_REPEATED_TIMES, sn)
+        self.shm_mgr.remove_value(self.shm_key_pkts_to_repeat, sn)
+        self.shm_mgr.remove_value(self.shm_key_last_repeat_time, sn)
+        self.shm_mgr.remove_value(self.shm_key_next_repeat_time, sn)
+        self.shm_mgr.remove_value(self.shm_key_max_repeat_times, sn)
+        self.shm_mgr.remove_value(self.shm_key_repeated_times, sn)
 
     def repeat_pkt(self, pkt, max_rpt_times=5):
         self.store_pkt(pkt, need_repeat=True, max_rpt_times=max_rpt_times)
 
     def get_repeating_sn_list(self):
-        self.shm_mgr.read_key(SHM_KEY_PKTS_TO_REPEAT)
+        self.shm_mgr.read_key(self.shm_key_pkts_to_repeat)
         return data.get('value')
 
     def set_pkt_last_repeat_time(self, sn, timestamp):
-        self.shm_mgr.add_value(SHM_KEY_LAST_REPEAT_TIME, {sn: timestamp})
+        self.shm_mgr.add_value(self.shm_key_last_repeat_time, {sn: timestamp})
 
     def get_pkt_last_repeat_time(self, sn):
-        shm_data = self.shm_mgr.get_value(SHM_KEY_LAST_REPEAT_TIME, sn)
+        shm_data = self.shm_mgr.get_value(self.shm_key_last_repeat_time, sn)
         return shm_data.get('value')
 
     def set_pkt_next_repeat_time(self, sn, timestamp):
-        self.shm_mgr.add_value(SHM_KEY_NEXT_REPEAT_TIME, {sn: timestamp})
+        self.shm_mgr.add_value(self.shm_key_next_repeat_time, {sn: timestamp})
 
     def get_pkt_next_repeat_time(self, sn):
-        shm_data = self.shm_mgr.get_value(SHM_KEY_NEXT_REPEAT_TIME, sn)
+        shm_data = self.shm_mgr.get_value(self.shm_key_next_repeat_time, sn)
         return shm_data.get('value')
 
     def set_pkt_max_repeat_times(self, sn, times):
-        self.shm_mgr.add_value(SHM_KEY_MAX_REPEAT_TIMES, {sn: times})
+        self.shm_mgr.add_value(self.shm_key_max_repeat_times, {sn: times})
 
     def get_pkt_max_repeat_times(self, sn):
-        shm_data = self.shm_mgr.get_value(SHM_KEY_MAX_REPEAT_TIMES, sn)
+        shm_data = self.shm_mgr.get_value(self.shm_key_max_repeat_times, sn)
         return shm_data.get('value')
 
     def set_pkt_repeated_times(self, sn, times):
-        self.shm_mgr.add_value(SHM_KEY_REPEATED_TIMES, {sn: times})
+        self.shm_mgr.add_value(self.shm_key_repeated_times, {sn: times})
 
     def get_pkt_repeated_times(self, sn):
-        shm_data = self.shm_mgr.get_value(SHM_KEY_REPEATED_TIMES, sn)
+        shm_data = self.shm_mgr.get_value(self.shm_key_repeated_times, sn)
         return shm_data.get('value')
 
     def increase_pkt_repeated_times(self, sn):
@@ -200,7 +220,10 @@ class SpecialPacketRepeater():
 
     ''' The repeater for special packets
 
-    A standalone worker for sending special packets repeatedly.
+    A special worker for sending special packets repeatedly.
+
+    Actually, the packet repeater is a part of the packet manager though
+    we made it standalone, but it still work together with the packet manager.
     '''
 
     def __init__(self, config, interval_args=(0.5, 1)):
@@ -218,13 +241,27 @@ class SpecialPacketRepeater():
 
         self.pkt_mgr = SpecialPacketManager(config)
         self.pkt_mgr.init_shm()
+        self.efferent = NodeContext.main_efferent
+        self.protocol_wrapper = NodeContext.protocol_wrapper
 
-    def repeat_pkt(self, pkt):
-        pass
-        # to be continued ......
+    def shutdown(self):
+        pid = NodeContext.pid
+        if pid is None:
+            raise RuntimeError(
+                'The pid of SpecialPacketRepeater is not sotred in NodeContext'
+            )
+
+        try:
+            os.kill(pid, sig.SIGTERM)
+        except ProcessLookupError:
+            pass
 
     def gen_interval(self):
         return random.uniform(*self.interval_args)
+
+    def repeat_pkt(self, pkt):
+        pkt = self.protocol_wrapper.wrap(pkt)
+        self.efferent.transmit(pkt)
 
     def repeat(self, sn, pkt, current_ts):
         interval = self.gen_interval()
@@ -240,7 +277,7 @@ class SpecialPacketRepeater():
 
         while self.__running:
             sn_list = self.pkt_mgr.get_repeating_sn_list()
-            interval_to_next_poll = 0
+            interval_to_next_poll = 1
 
             for sn in sn_list:
                 pkt = self.pkt_mgr.get_pkt(sn)

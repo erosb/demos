@@ -21,6 +21,7 @@ MAIN_LOG_LOGGERS = [
     'Afferent',
     'Efferent',
     'Logic',
+    'PktMgr',
 ]
 
 
