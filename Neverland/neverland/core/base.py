@@ -190,28 +190,21 @@ class BaseCore():
 
         logger.info('Trying to join cluster...')
 
-        local_ip = get_localhost_ip()
-        port = self.main_afferent.listen_port
-        src = (local_ip, port)
-
         content = {"identification": identification}
         subject = ClusterControllingSubjects.JOIN_CLUSTER
 
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          type=PktTypes.CTRL,
-                         src=src,
                          dest=entrance,
                          subject=subject,
                          content=content,
                      )
         pkt.next_hop = (entrance.ip, entrance.port)
 
-        pkt = self.protocol_wrapper.wrap(pkt)
-        self.efferent.transmit(pkt)
-
+        NodeContext.pkt_mgr.repeat_pkt(pkt)
         logger.info(
-            f'Sent request to cluster entrance {entrance.ip}:{entrance.port}'
+            f'Sending request to cluster entrance {entrance.ip}:{entrance.port}'
         )
 
         logger.info('[Node Status] WAITING_FOR_JOIN')
@@ -231,10 +224,6 @@ class BaseCore():
 
         logger.info('Trying to leave cluster...')
 
-        local_ip = get_localhost_ip()
-        port = self.main_afferent.listen_port
-        src = (local_ip, port)
-
         content = {"identification": identification}
         subject = ClusterControllingSubjects.LEAVE_CLUSTER
 
@@ -248,9 +237,7 @@ class BaseCore():
                      )
         pkt.next_hop = (entrance.ip, entrance.port)
 
-        pkt = self.protocol_wrapper.wrap(pkt)
-        self.efferent.transmit(pkt)
-
+        NodeContext.pkt_mgr.repeat_pkt(pkt)
         logger.info(
             f'Sent request to cluster entrance {entrance.ip}:{entrance.port}'
         )

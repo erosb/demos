@@ -322,6 +322,7 @@ class BaseNode():
         NodeContext.core = self.core
         NodeContext.main_efferent = self.efferent
         NodeContext.protocol_wrapper = self.protocol_wrapper
+        NodeContext.pkt_mgr = self.pkt_mgr
 
         logger.debug('Node context created')
 
@@ -341,42 +342,9 @@ class BaseNode():
         epoll.register(self.main_afferent.fd, select.EPOLLIN)
 
         self.core.request_to_join_cluster()
+        self.core.run()
 
-        max_poll_times = 4
-        polled_time = 0
-
-        while polled_time < max_poll_times:
-            polled_time += 1
-
-            events = epoll.poll(8)
-            for fd, evt in events:
-                if evt & select.EPOLLERR:
-                    continue
-                elif evt & select.EPOLLIN:
-                    pkt = afferent.recv()
-
-                    p_hop_ip = pkt.previous_hop[0]
-                    if p_hop_ip != self.config.cluster_entrance.ip:
-                        logger.warn(
-                            f'Unexpected packet source of cluster joining '
-                            f'response: {p_hop_ip}'
-                        )
-                        continue
-
-                    self.protocol_wrapper.unwrap(pkt)
-                    if not pkt.valid:
-                        logger.warn(
-                            f'Invalid packet of cluster joining '
-                            f'response from {p_hop_ip}'
-                        )
-                        continue
-
-                    if pkt.fields.subject == ClusterControllingSubject.RESPONSE:
-                        content = pkt.fields.content.body
-
-                # TODO to be continued......
-
-        raise FailedToJoinCluster
+        # raise FailedToJoinCluster
 
     def run(self):
         self.daemonize()

@@ -7,7 +7,11 @@ import time
 import struct
 
 from neverland.pkt import UDPPacket, PktTypes, FieldTypes
-from neverland.utils import ObjectifiedDict, HashTools
+from neverland.utils import (
+    HashTools,
+    ObjectifiedDict,
+    get_localhost_ip,
+)
 from neverland.node.context import NodeContext
 from neverland.exceptions import (
     PktWrappingError,
@@ -109,6 +113,19 @@ class ComplexedFormat(BasePktFormat):
         '''
 
         self.__fmt__.update(fmt_cls.__fmt__)
+
+
+def src_calculator(pkt, header_fmt, body_fmt):
+    ''' calculator for the src field
+    '''
+
+    core = NodeContext.core
+    if core is None:
+        raise RuntimeError('NodeContext not created')
+
+    local_ip = get_localhost_ip()
+    port = self.main_afferent.listen_port
+    return (local_ip, port)
 
 
 def sn_calculator(pkt, header_fmt, body_fmt):
