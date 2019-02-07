@@ -3,6 +3,7 @@
 
 import os
 import json
+import time
 import select
 import logging
 
@@ -16,6 +17,7 @@ from neverland.utils import (
 from neverland.exceptions import (
     DropPacket,
     ConfigError,
+    ArgumentError,
     SharedMemoryError,
     SHMResponseTimeout,
 )
@@ -259,19 +261,42 @@ class BaseCore():
         pkt = self.protocol_wrapper.wrap(pkt)
         self.efferent.transmit(pkt)
 
+    def _poll(self):
+        events = self._epoll.poll(POLL_TIMEOUT)
+        for fd, evt in events:
+            afferent = self.afferent_mapping[fd]
+
+            if evt & select.EPOLLERR:
+                self.unplug_afferent(fd)
+                afferent.destory()
+            elif evt & select.EPOLLIN:
+                pkt = afferent.recv()
+                self.handle_pkt(pkt)
+
     def run(self):
         self.__running = True
         while self.__running:
-            events = self._epoll.poll(POLL_TIMEOUT)
-            for fd, evt in events:
-                afferent = self.afferent_mapping[fd]
+            self._poll()
 
-                if evt & select.EPOLLERR:
-                    self.unplug_afferent(fd)
-                    afferent.destory()
-                elif evt & select.EPOLLIN:
-                    pkt = afferent.recv()
-                    self.handle_pkt(pkt)
+    def run_for_a_while(self, duration=None, polling_times=None):
+        ''' run the core within the specified duration time or poll times
+
+        :param duration: the duration time, seconds in int
+        :param polling_times: times the _poll method shall be invoked, int
+
+        These 2 arguments will not work together, if duration specified, the
+        poll_times will be ignored
+        '''
+
+        if duration is not None:
+            starting_time = time.time()
+            while time.time() - starting_time <= duration:
+                self._poll()
+        elif polling_times is not None:
+            for _ in polling_times:
+                self._poll()
+        else:
+            raise ArgumentError('no argument passed')
 
     def shutdown(self):
         self.__running = False

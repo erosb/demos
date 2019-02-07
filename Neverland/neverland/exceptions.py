@@ -32,14 +32,6 @@ class DropPacket(Exception):
     '''
 
 
-class FailedToJoinCluster(Exception):
-    pass
-
-
-class FailedToDetachFromCluster(Exception):
-    pass
-
-
 class SharedMemoryError(Exception):
     pass
 
@@ -61,4 +53,24 @@ class SHMWorkerConnectFailed(SharedMemoryError):
 
 
 class SHMResponseTimeout(SharedMemoryError):
+    pass
+
+
+class Info(Exception):
+
+    ''' special informations
+    
+    This kind of exceptions are not true exceptions, they are used to break
+    the logic chain and send back a special information to the upper-layer
+    '''
+
+class SuccessfullyJoinedCluster(Info):
+    pass
+
+
+class FailedToJoinCluster(Info):
+    pass
+
+
+class FailedToDetachFromCluster(Info):
     pass

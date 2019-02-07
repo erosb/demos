@@ -11,6 +11,7 @@ import logging
 from neverland.exceptions import (
     FailedToJoinCluster,
     FailedToDetachFromCluster,
+    SuccessfullyJoinedCluster,
 )
 from neverland.utils import get_localhost_ip
 from neverland.node import Roles
@@ -338,13 +339,14 @@ class BaseNode():
         logger.debug('Node context cleaned')
 
     def join_cluster(self):
-        epoll = select.epoll()
-        epoll.register(self.main_afferent.fd, select.EPOLLIN)
+        if self.role == Roles.CONTROLLER:
+            raise RuntimeError(
+                'Controller node is the root node of the cluster'
+            )
 
         self.core.request_to_join_cluster()
-        self.core.run()
-
-        # raise FailedToJoinCluster
+        self.core.run_for_a_while(5)
+        raise TimeoutError
 
     def run(self):
         self.daemonize()
@@ -360,7 +362,16 @@ class BaseNode():
 
         # Before we start workers, we need to join the cluster first.
         if self.role != Roles.CONTROLLER:
+        try:
             self.join_cluster()
+        except SuccessfullyJoinedCluster:
+            logger.info('Successfully joined the cluster.')
+        except FailedToJoinCluster:
+            logger.error('Cannot join the cluster, request not permitted')
+            return
+        except TimeoutError:
+            logger.error('No response from cluster, failed to join the cluster')
+            return
 
         self._clean_modules()
         self._clean_context()

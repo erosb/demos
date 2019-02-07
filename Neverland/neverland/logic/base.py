@@ -31,10 +31,13 @@ class BaseLogicHandler():
             raise DropPacket
 
     def handle_data(self, pkt):
-        pass
+        ''' handle packets with type flag 0x01 DATA
+        '''
 
     def handle_ctrl(self, pkt):
-        pass
+        ''' handle packets with type flag 0x02 CTRL
+        '''
 
     def handle_conn_ctrl(self, pkt):
-        pass
+        ''' handle packets with type flag 0x03 CONN_CTRL
+        '''
