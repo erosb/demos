@@ -362,19 +362,19 @@ class BaseNode():
 
         # Before we start workers, we need to join the cluster first.
         if self.role != Roles.CONTROLLER:
-        try:
-            self.join_cluster()
-        except SuccessfullyJoinedCluster:
-            logger.info('Successfully joined the cluster.')
-        except FailedToJoinCluster:
-            logger.error('Cannot join the cluster, request not permitted')
-            return
-        except TimeoutError:
-            logger.error('No response from cluster, failed to join the cluster')
-            return
+            try:
+                self.join_cluster()
+            except SuccessfullyJoinedCluster:
+                logger.info('Successfully joined the cluster.')
+            except FailedToJoinCluster:
+                logger.error('Cannot join the cluster, request not permitted')
+                return
+            except TimeoutError:
+                logger.error('No response from cluster, failed to join the cluster')
+                return
 
-        self._clean_modules()
-        self._clean_context()
+            self._clean_modules()
+            self._clean_context()
 
         # start normal workers
         worker_amount = self.config.basic.worker_amount
