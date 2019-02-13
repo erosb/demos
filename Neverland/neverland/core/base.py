@@ -44,7 +44,7 @@ class BaseCore():
     It organizes other components to work together and administrate them.
     Some components are plugable, and some others are necessary.
 
-    Here is the list of all plugable components:
+    Here is the list of all components:
         afferents in neverland.afferents, plugable
         efferents in neverland.efferents, necessary
         logic handlers in neverland.logic, necessary
