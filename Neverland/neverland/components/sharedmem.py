@@ -375,11 +375,14 @@ class SharedMemoryManager():
         sock.setblocking(blocking)
         try:
             if socket_path is not None:
+                logger.debug(
+                    f'created socket and tring to bind on {socket_path}'
+                )
                 sock.bind(socket_path)
         except OSError as err:
             if err.errno == 98:
                 raise AddressAlreadyInUse(
-                    f'{socket_path} is already in use, connot bind on it'
+                    f'{socket_path} is already in use, cannot bind on it'
                 )
             else:
                 raise err
@@ -947,6 +950,7 @@ class SharedMemoryManager():
             conn_id = data.get('conn_id')
             self.current_connection = Connection(
                                           socket=sock,
+                                          socket_name=socket_name,
                                           conn_id=conn_id,
                                       )
 
@@ -956,10 +960,15 @@ class SharedMemoryManager():
 
         conn = self.current_connection
         self.send_request(
-            conn_id=conn.id,
+            conn_id=conn.conn_id,
             action=Actions.DISCONNECT,
         )
+
         conn.socket.close()
+        socket_path = os.path.join(self.socket_dir, conn.socket_name)
+        os.remove(socket_path)
+
+        logger.debug(f'remove socket: {socket_path}')
         self.current_connection = None
 
     def lock_key(self, key, backlogging=True):

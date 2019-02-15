@@ -32,7 +32,7 @@ class UDPReceiver():
                                       )[0]
         sock = socket.socket(af, type_, proto)
 
-        self.setsockopt(self._sock)
+        self.setsockopt(sock)
         sock.setblocking(False)
         return sock
 
@@ -46,7 +46,7 @@ class UDPReceiver():
             (self.listen_addr, self.listen_port)
         )
 
-    def destory(self):
+    def destroy(self):
         self._sock.close()
         self._sock = None
 

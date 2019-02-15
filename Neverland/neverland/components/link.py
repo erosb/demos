@@ -36,3 +36,6 @@ class LinkMonitor():
         average delay time of response
         packet loss rate
     '''
+
+    def __init__(self, config):
+        self.config = config

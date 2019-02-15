@@ -117,6 +117,9 @@ class SpecialPacketManager():
             SHMContainerTypes.DICT,
         )
 
+    def close_shm(self):
+        self.shm_mgr.disconnect()
+
     def store_pkt(self, pkt, need_repeat=False, max_rpt_times=5):
         sn = pkt.fields.sn
         type_ = pkt.fields.type
@@ -188,8 +191,8 @@ class SpecialPacketManager():
         self.store_pkt(pkt, need_repeat=True, max_rpt_times=max_rpt_times)
 
     def get_repeating_sn_list(self):
-        self.shm_mgr.read_key(self.shm_key_pkts_to_repeat)
-        return data.get('value')
+        shm_data = self.shm_mgr.read_key(self.shm_key_pkts_to_repeat)
+        return shm_data.get('value')
 
     def set_pkt_last_repeat_time(self, sn, timestamp):
         self.shm_mgr.add_value(self.shm_key_last_repeat_time, {sn: timestamp})
@@ -258,22 +261,17 @@ class SpecialPacketRepeater():
         self.interval_args = interval_args
 
         self.pkt_mgr = SpecialPacketManager(config)
-        self.pkt_mgr.init_shm()
         self.efferent = NodeContext.main_efferent
         self.protocol_wrapper = NodeContext.protocol_wrapper
 
-    def shutdown(self):
-        pid = NodeContext.pid
-        if pid is None:
-            raise RuntimeError(
-                'The pid of SpecialPacketRepeater is not sotred in NodeContext'
-            )
+    def init_shm(self):
+        self.pkt_mgr.init_shm()
 
-        try:
-            logger.info(f'killing SpecialPacketRepeater process {pid}')
-            os.kill(pid, sig.SIGTERM)
-        except ProcessLookupError:
-            logger.info(f'SpecialPacketRepeater process {pid} does not exists')
+    def close_shm(self):
+        self.shm_mgr.disconnect()
+
+    def shutdown(self):
+        self.__running = False
 
     def gen_interval(self):
         return random.uniform(*self.interval_args)
@@ -337,7 +335,8 @@ class SpecialPacketRepeater():
                     self.repeat(sn, pkt, current_ts)
 
             s = interval_to_next_poll   # too long ...
-            logger.debug('SpecialPacketRepeater is going to sleep {s} sec.')
+            #logger.debug(f'SpecialPacketRepeater is going to sleep {s} sec.')
             time.sleep(s)
 
+        self.pkt_mgr.close_shm()
         logger.info(f'SpecialPacketRepeater worker {pid} exits')

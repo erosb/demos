@@ -94,7 +94,6 @@ class BaseCore():
         self.logic_handler = logic_handler
         self.protocol_wrapper = protocol_wrapper
 
-        self.id_generator = IDGenerator()
         self.shm_mgr = SharedMemoryManager(self.config)
 
         self.plug_afferent(self.main_afferent)
@@ -124,6 +123,9 @@ class BaseCore():
         )
 
         logger.debug(f'init_shm for core of worker {NodeContext.pid} has done')
+
+    def close_shm(self):
+        self.shm_mgr.disconnect()
 
     def self_allocate_core_id(self):
         ''' Let the core pick up an id for itself
@@ -268,7 +270,7 @@ class BaseCore():
 
             if evt & select.EPOLLERR:
                 self.unplug_afferent(fd)
-                afferent.destory()
+                afferent.destroy()
             elif evt & select.EPOLLIN:
                 pkt = afferent.recv()
                 self.handle_pkt(pkt)

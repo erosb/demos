@@ -9,6 +9,7 @@ import signal as sig
 import logging
 
 from neverland.exceptions import (
+    PidFileNotExists,
     FailedToJoinCluster,
     FailedToDetachFromCluster,
     SuccessfullyJoinedCluster,
@@ -98,9 +99,23 @@ class BaseNode():
             f'wrote pid file {pid_path} for master process, pid: {pid}'
         )
 
+    def _read_master_pid(self):
+        pid_path = self.config.basic.pid_file
+
+        try:
+            with open(pid_path, 'r') as f:
+                content = f.read()
+        except FileNotFoundError:
+            raise PidFileNotExists
+
+        try:
+            return int(content)
+        except ValueError:
+            raise ValueError('pid file has beed tampered')
+
     def _handle_term_master(self, signal, sf):
         logger.debug(f'Master process received signal: {signal}')
-        logger.debug(f'Start to shut down workers')
+        logger.debug(f'The master process starts to shut down workers')
         self.shutdown_workers()
 
         pid_path = self.config.basic.pid_file
@@ -166,10 +181,11 @@ class BaseNode():
 
             time.sleep(0.5)
 
-        # shutdown SharedMemoryManager worker at last
+        # shutdown SharedMemoryManager and SpecialPacketRepeater worker at last
         self._kill(self.shm_worker_pid)
         os.waitpid(self.shm_worker_pid, 0)
         logger.debug(f'SharedMemoryManager worker {pid} terminated')
+
         logger.debug('All workers terminated')
 
     def _kill(self, pid):
@@ -226,22 +242,23 @@ class BaseNode():
         elif pid == 0:
             self._sig_shm_worker()
             self.shm_mgr.run_as_worker()
-            return  # the sub-process ends here
+            sys.exit(0)  # the sub-process ends here
         else:
             self.shm_worker_pid = pid
             logger.info(f'Started SharedMemoryManager: {pid}')
 
     def _start_pkt_rpter(self):
-        self.pkt_rpter = SpecialPacketRepeater(self.config)
-
         pid = os.fork()
         if pid == -1:
             raise OSError('fork failed')
         elif pid == 0:
             self._sig_pkt_rpter_worker()
+            self.pkt_rpter = SpecialPacketRepeater(self.config)
+            self.pkt_rpter.init_shm()
             self.pkt_rpter.run()
-            return  # the sub-process ends here
+            sys.exit(0)  # the sub-process ends here
         else:
+            self.pkt_rpter = SpecialPacketRepeater(self.config)
             self.pkt_rpter_worker_pid = pid
             logger.info(f'Started SpecialPacketRepeater: {pid}')
 
@@ -279,12 +296,30 @@ class BaseNode():
         # repeater but not share it like the shared memory manager worker
         self._start_pkt_rpter()
 
-        logger.debug('Node modules loaded')
+        self.logic_handler.init_shm()
+
+        self.core.init_shm()
+        self.core.self_allocate_core_id()
+
+        self.pkt_mgr.init_shm()
+
+        pid = os.getpid()
+        logger.debug(f'Worker {pid} loaded modules')
 
     def _clean_modules(self):
+        self._kill(self.pkt_rpter_worker_pid)
+        os.waitpid(self.pkt_rpter_worker_pid, 0)
+        logger.debug(
+            f'SpecialPacketRepeater worker '
+            f'{self.pkt_rpter_worker_pid} terminated'
+        )
+
         self.core.shutdown()
         self.main_afferent.destroy()
-        self.pkt_rpter.shutdown()
+
+        self.pkt_mgr.close_shm()
+        self.core.close_shm()
+        self.logic_handler.close_shm()
 
         self.main_afferent = None
         self.efferent = None
@@ -292,43 +327,27 @@ class BaseNode():
         self.logic_handler = None
         self.core = None
         self.pkt_mgr = None
-        self.pkt_rpter = None
-        self.pkt_rpter_worker_pid = None
 
-        logger.debug('Node modules cleaned')
-
-    def _get_modules_ready(self):
-        ''' an additional init step for part of modules
-        '''
-
-        self.logic_handler.init_shm()
-
-        self.core.self_allocate_core_id()
-        self.core.init_shm()
-
-        self.id_generator = IDGenerator(self.node_id, self.core.core_id)
-
-        self.pkt_mgr.init_shm()
-
-        logger.debug('Additional init step for node modules done')
+        pid = os.getpid()
+        logger.debug(f'Worker {pid} cleaned modules')
 
     def get_context():
         return NodeContext
 
     def _create_context(self):
-        NodeContext.pid = os.getpid()
         NodeContext.pkt_rpter_pid = self.pkt_rpter_worker_pid
-        NodeContext.id_generator = self.id_generator
         NodeContext.local_ip = get_localhost_ip()
         NodeContext.core = self.core
         NodeContext.main_efferent = self.efferent
         NodeContext.protocol_wrapper = self.protocol_wrapper
         NodeContext.pkt_mgr = self.pkt_mgr
 
-        logger.debug('Node context created')
+        NodeContext.id_generator = IDGenerator(self.node_id, self.core.core_id)
+
+        pid = os.getpid()
+        logger.debug(f'Worker {pid} created NodeContext')
 
     def _clean_context(self):
-        NodeContext.pid = None
         NodeContext.pkt_rpter_pid = None
         NodeContext.id_generator = None
         NodeContext.local_ip = None
@@ -336,7 +355,8 @@ class BaseNode():
         NodeContext.main_efferent = None
         NodeContext.protocol_wrapper = None
 
-        logger.debug('Node context cleaned')
+        pid = os.getpid()
+        logger.debug('Worker {pid} cleaned NodeContext')
 
     def join_cluster(self):
         if self.role == Roles.CONTROLLER:
@@ -350,18 +370,19 @@ class BaseNode():
 
     def run(self):
         self.daemonize()
+        NodeContext.pid = os.getpid()
+
         self._write_master_pid()
         self._start_shm_mgr()
 
-        # Before we join the cluster, we need to load modules at first,
-        # once we have joined the cluster, modules in the Master worker
-        # shall be removed.
-        self._load_modules()
-        self._create_context()
-        self._get_modules_ready()
-
         # Before we start workers, we need to join the cluster first.
         if self.role != Roles.CONTROLLER:
+            # Before we join the cluster, we need to load modules at first,
+            # once we have joined the cluster, modules in the Master worker
+            # shall be removed.
+            self._load_modules()
+            self._create_context()
+
             try:
                 self.join_cluster()
             except SuccessfullyJoinedCluster:
@@ -370,7 +391,9 @@ class BaseNode():
                 logger.error('Cannot join the cluster, request not permitted')
                 return
             except TimeoutError:
-                logger.error('No response from cluster, failed to join the cluster')
+                logger.error(
+                    'No response from cluster, failed to join the cluster'
+                )
                 return
 
             self._clean_modules()
@@ -380,6 +403,7 @@ class BaseNode():
         worker_amount = self.config.basic.worker_amount
         for _ in range(worker_amount):
             pid = os.fork()
+            NodeContext.pid = os.getpid()
 
             if pid == -1:
                 raise OSError('fork failed')
@@ -387,12 +411,18 @@ class BaseNode():
                 self._sig_normal_worker()
                 self._load_modules()
                 self._create_context()
-                self._get_modules_ready()
                 self.core.run()
-                return  # the sub-process ends here
+                self._clean_modules()
+                self._clean_context()
+                sys.exit(0)  # the sub-process ends here
             else:
                 self.worker_pids.append(pid)
                 logger.info(f'Started Worker: {pid}')
 
         os.waitpid(-1, 0)
         logger.info('Node exits.')
+
+    def shutdown(self):
+        pid = self._read_master_pid()
+        self._kill(pid)
+        logger.info('Sent SIGTERM to the master process')

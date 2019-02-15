@@ -15,10 +15,15 @@ class BaseLogicHandler():
 
     def __init__(self, config):
         self.config = config
+        self.shm_mgr = None
 
     def init_shm(self):
         ''' initialize the shared memory
         '''
+
+    def close_shm(self):
+        if self.shm_mgr is not None:
+            self.shm_mgr.disconnect()
 
     def handle_logic(self, pkt):
         if pkt.fields.type == PktTypes.DATA:

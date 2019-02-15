@@ -2,16 +2,20 @@
 #coding: utf-8
 
 import sys
+import logging
 import argparse
 
 from neverland.logging import init_all_loggers
-from neverland.exceptions import ArgumentError
+from neverland.exceptions import ArgumentError, PidFileNotExists
 from neverland.config import ConfigLoader
 from neverland.node import Roles
 from neverland.node.relay import RelayNode
 from neverland.node.client import ClientNode
 from neverland.node.outlet import OutletNode
 from neverland.node.controller import ControllerNode
+
+
+logger = logging.getLogger('Main')
 
 
 STANDARD_ROLE_NAME_MAPPING = {
@@ -41,6 +45,11 @@ def parse_cli_args():
                prog='Neverland',
                description='Construct your very own Neverland',
            )
+    argp.add_argument(
+        'action',
+        metavar='<action>',
+        help='Controll the service. options: start/stop/status',
+    )
     argp.add_argument(
         '-c',
         metavar='<path>',
@@ -75,7 +84,19 @@ def launch():
     node_cls = ROLE_NODE_CLS_MAPPING.get(node_role)
 
     node = node_cls(config)
-    node.run()
+
+    if args.action == 'start':
+        node.run()
+    elif args.action == 'stop':
+        try:
+            node.shutdown()
+        except PidFileNotExists:
+            logger.info(
+                'pid file doesn\'t exists, seems Neverland is not running'
+            )
+            sys.exit(1)
+    elif args.action == 'status':
+        raise NotImplementedError('Not Implemented yet')
 
 
 if __name__ == '__main__':

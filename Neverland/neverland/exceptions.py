@@ -10,6 +10,10 @@ class ConfigError(Exception):
     pass
 
 
+class PidFileNotExists(FileNotFoundError):
+    pass
+
+
 class PktWrappingError(Exception):
     pass
 

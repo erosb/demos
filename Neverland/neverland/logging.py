@@ -42,7 +42,7 @@ def init_all_loggers(config):
         logger_conf = getattr(config.log, MAIN_LOGGER_CONFIG_KW)
 
         level = lv_map.get(logger_conf.level) or logging.INFO
-        paht = logger_conf.path
+        path = logger_conf.path
         stdout_enabled = logger_conf.stdout
 
         init_logger(logger, level, path, stdout_enabled)
@@ -57,14 +57,14 @@ def init_all_loggers(config):
 
         init_logger(logger, level, path, stdout_enabled)
 
-    main_logger.info(f'Main log level: {log_level}')
+    main_logger.info(f'Main log level: {logger_conf.level}')
 
 
 def init_logger(logger, lv, log_path=None, stdout_enabled=True):
     logger.setLevel(lv)
 
     formatter = logging.Formatter(
-        '%(asctime)s - [%(name)s] - %(levelname)s: %(message)s'
+        '%(asctime)s - [%(name)s] - [%(levelname)s]: %(message)s'
     )
 
     if log_path is not None:
