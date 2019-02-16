@@ -74,6 +74,9 @@ def launch():
     init_all_loggers(config)
 
     node_role_name = args.r
+    if node_role_name is None:
+        raise ArgumentError('Role is not specified')
+
     node_role = (
         STANDARD_ROLE_NAME_MAPPING.get(node_role_name) or
         CODE_STYLE_ROLE_NAME_MAPPING.get(node_role_name)

@@ -1,7 +1,7 @@
 {
 	"basic": {
 		"node_id": 1,
-		"worker_amount": 2,
+		"worker_amount": 4,
 		"pid_file": "/tmp/nl_master.pid"
 	},
 
@@ -20,7 +20,7 @@
 
 	"shm": {
 		"socket_dir": "/tmp/nl_shm",
-		"manager_socket_name": "manager"
+		"manager_socket_name": "SHM-Manager.socket"
 	},
 
 	"log": {
