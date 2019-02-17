@@ -52,7 +52,7 @@ def init_all_loggers(config):
         logger_conf = getattr(config.log, conf_kw)
 
         level = lv_map.get(logger_conf.level) or logging.INFO
-        paht = logger_conf.path
+        path = logger_conf.path
         stdout_enabled = logger_conf.stdout
 
         init_logger(logger, level, path, stdout_enabled)
