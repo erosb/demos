@@ -22,7 +22,7 @@ ROLE_NAMES = Roles._keys()
 
 class ControllerLogicHandler(BaseLogicHandler):
 
-    SHM_SOCKET_NAME_TEMPLATE = 'SHM-CtrlLogic-%d.socket'
+    SHM_SOCKET_NAME_TEMPLATE = 'SHM-Logic-Ctrl-%d.socket'
 
     # SHM container for containing all nodes added into the cluster
     # data structure:

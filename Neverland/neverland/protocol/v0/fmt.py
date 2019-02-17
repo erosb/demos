@@ -5,6 +5,7 @@ from neverland.pkt import FieldTypes, PktTypes
 from neverland.protocol.base import (
     FieldDefinition,
     BasePktFormat,
+    src_calculator,
     salt_calculator,
     mac_calculator,
     sn_calculator,
@@ -90,6 +91,8 @@ class HeaderFormat(BasePktFormat):
             'src': FieldDefinition(
                        length = None if config.net.ipv6 else 6,
                        type   = FieldTypes.STRUCT_IPV4_SA,
+                       calculator    = src_calculator,
+                       calc_priority = 0x00,
                    ),
 
             # The destination of the packet

@@ -7,6 +7,7 @@ import time
 import select
 import signal as sig
 import logging
+import traceback
 
 from neverland.exceptions import (
     PidFileNotExists,
@@ -44,6 +45,7 @@ from neverland.components.pktmgmt import (
 
 
 logger = logging.getLogger('Node')
+shm_logger = logging.getLogger('SHM')
 
 
 AFFERENT_MAPPING = {
@@ -122,7 +124,6 @@ class BaseNode():
         if os.path.isfile(pid_path):
             logger.debug(f'Remove pid file: {pid_path}')
             os.remove(pid_path)
-        sys.exit(0)
 
     def _handle_term_worker(self, signal, sf):
         pid = os.getpid()
@@ -181,10 +182,11 @@ class BaseNode():
 
             time.sleep(0.5)
 
-        # shutdown SharedMemoryManager and SpecialPacketRepeater worker at last
-        self._kill(self.shm_worker_pid)
-        os.waitpid(self.shm_worker_pid, 0)
-        logger.debug(f'SharedMemoryManager worker {pid} terminated')
+        # shutdown SharedMemoryManager worker at last
+        shm_pid = self.shm_worker_pid
+        self._kill(shm_pid)
+        os.waitpid(shm_pid, 0)
+        logger.debug(f'SharedMemoryManager worker {shm_pid} terminated')
 
         logger.debug('All workers terminated')
 
@@ -241,7 +243,16 @@ class BaseNode():
             raise OSError('fork failed')
         elif pid == 0:
             self._sig_shm_worker()
-            self.shm_mgr.run_as_worker()
+            try:
+                self.shm_mgr.run_as_worker()
+            except Exception:
+                err_msg = traceback.format_exc()
+                shm_logger.error(
+                    f'Unexpected error occurred, SHM worker crashed. '
+                    f'Traceback:\n{err_msg}'
+                )
+                sys.exit(1)
+
             sys.exit(0)  # the sub-process ends here
         else:
             self.shm_worker_pid = pid
@@ -254,8 +265,18 @@ class BaseNode():
         elif pid == 0:
             self._sig_pkt_rpter_worker()
             self.pkt_rpter = SpecialPacketRepeater(self.config)
-            self.pkt_rpter.init_shm()
-            self.pkt_rpter.run()
+
+            try:
+                self.pkt_rpter.init_shm()
+                self.pkt_rpter.run()
+            except Exception:
+                err_msg = traceback.format_exc()
+                logger.error(
+                    f'Unexpected error occurred, SpecialPacketRepeater worker '
+                    f'crashed. Traceback:\n{err_msg}'
+                )
+                sys.exit(1)
+
             sys.exit(0)  # the sub-process ends here
         else:
             self.pkt_rpter = SpecialPacketRepeater(self.config)
@@ -317,9 +338,9 @@ class BaseNode():
         self.core.shutdown()
         self.main_afferent.destroy()
 
-        self.pkt_mgr.close_shm()
-        self.core.close_shm()
         self.logic_handler.close_shm()
+        self.core.close_shm()
+        self.pkt_mgr.close_shm()
 
         self.main_afferent = None
         self.efferent = None
@@ -337,6 +358,7 @@ class BaseNode():
     def _create_context(self):
         NodeContext.pkt_rpter_pid = self.pkt_rpter_worker_pid
         NodeContext.local_ip = get_localhost_ip()
+        NodeContext.listen_port = self.config.net.aff_listen_port
         NodeContext.core = self.core
         NodeContext.main_efferent = self.efferent
         NodeContext.protocol_wrapper = self.protocol_wrapper
@@ -351,6 +373,7 @@ class BaseNode():
         NodeContext.pkt_rpter_pid = None
         NodeContext.id_generator = None
         NodeContext.local_ip = None
+        NodeContext.listen_port = None
         NodeContext.core = None
         NodeContext.main_efferent = None
         NodeContext.protocol_wrapper = None
@@ -369,6 +392,27 @@ class BaseNode():
         raise TimeoutError
 
     def run(self):
+        pid_fl = self.config.basic.pid_file
+        try:
+            pid = self._read_master_pid()
+            logger.warn(
+                f'\n\tThe Neverland node is already running or the pid file\n'
+                f'\t{pid_fl} is not removed, current pid: {pid}.\n'
+                f'\tMake sure that the node is not running and try again.\n\n'
+                f'\tIf you need to run multiple node on this computer, then\n'
+                f'\tyou need to at least configure another pid file for it.'
+            )
+            return
+        except ValueError:
+            logger.error(
+                f'\n\tThe pid file {pid_fl} exists but seems it\'s not\n'
+                f'\twritten by the Neverland node. Please make sure the node\n'
+                f'\tis not running and the pid file is not occupied.'
+            )
+            return
+        except PidFileNotExists:
+            pass
+
         self.daemonize()
         NodeContext.pid = os.getpid()
 
@@ -389,11 +433,17 @@ class BaseNode():
                 logger.info('Successfully joined the cluster.')
             except FailedToJoinCluster:
                 logger.error('Cannot join the cluster, request not permitted')
+                self._clean_modules()
+                self._clean_context()
+                self._on_break()
                 return
             except TimeoutError:
                 logger.error(
-                    'No response from cluster, failed to join the cluster'
+                    'No response from entrance node, Failed to join the cluster'
                 )
+                self._clean_modules()
+                self._clean_context()
+                self._on_break()
                 return
 
             self._clean_modules()
@@ -411,7 +461,20 @@ class BaseNode():
                 self._sig_normal_worker()
                 self._load_modules()
                 self._create_context()
-                self.core.run()
+
+                try:
+                    self.core.run()
+                except Exception:
+                    err_msg = traceback.format_exc()
+                    logger.error(
+                        f'Unexpected error occurred, node crashed. '
+                        f'Traceback:\n{err_msg}'
+                    )
+
+                    self._clean_modules()
+                    self._clean_context()
+                    sys.exit(1)
+
                 self._clean_modules()
                 self._clean_context()
                 sys.exit(0)  # the sub-process ends here
@@ -419,10 +482,29 @@ class BaseNode():
                 self.worker_pids.append(pid)
                 logger.info(f'Started Worker: {pid}')
 
-        os.waitpid(-1, 0)
-        logger.info('Node exits.')
+        while True:
+            try:
+                os.waitpid(-1, 0)
+            except ChildProcessError:
+                break
 
     def shutdown(self):
         pid = self._read_master_pid()
         self._kill(pid)
         logger.info('Sent SIGTERM to the master process')
+
+    def _on_break(self):
+        '''
+        a hook that needs to be invoked while self.run has been broken
+        by some exception
+        '''
+
+        shm_pid = self.shm_worker_pid
+        self._kill(shm_pid)
+        os.waitpid(shm_pid, 0)
+        logger.debug(f'SharedMemoryManager worker {shm_pid} terminated')
+
+        pid_fl = self.config.basic.pid_file
+        os.remove(pid_fl)
+        logger.debug(f'Removed pid file: {pid_fl}')
+        logger.info('Master process exits.\n\n')

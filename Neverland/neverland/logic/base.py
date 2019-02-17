@@ -2,6 +2,7 @@
 #coding: utf-8
 
 from neverland.pkt import PktTypes
+from neverland.node.context import NodeContext
 from neverland.exceptions import DropPacket
 
 
@@ -13,6 +14,8 @@ class BaseLogicHandler():
     packets should go and how many lanes should they use.
     '''
 
+    SHM_SOCKET_NAME_TEMPLATE = 'SHM-BaseLogicHandler-NotRenamed-%d.socket'
+
     def __init__(self, config):
         self.config = config
         self.shm_mgr = None
@@ -20,6 +23,10 @@ class BaseLogicHandler():
     def init_shm(self):
         ''' initialize the shared memory
         '''
+
+        self.shm_mgr.connect(
+            self.SHM_SOCKET_NAME_TEMPLATE % NodeContext.pid
+        )
 
     def close_shm(self):
         if self.shm_mgr is not None:

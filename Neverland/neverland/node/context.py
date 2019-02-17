@@ -16,8 +16,11 @@ class NodeContext():
     # pid of the packet repeater worker
     pkt_rpter_pid = None
 
-    # local IP address
+    # the IP address that the service is listening
     local_ip = None
+
+    # the port that the service is listening
+    listen_port = None
 
     # the IDGenerator instance
     id_generator = None

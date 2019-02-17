@@ -19,7 +19,7 @@
 	},
 
 	"shm": {
-		"socket_dir": "/tmp/nl_shm",
+		"socket_dir": "/tmp/nl-shm",
 		"manager_socket_name": "SHM-Manager.socket"
 	},
 
@@ -38,7 +38,7 @@
 
 	"cluster_nodes": {
 		"relay-0000": {
-			"ip": "192.168.122.23",
+			"ip": "192.168.1.7",
 			"role": "RELAY"
 		}
 	}

@@ -196,15 +196,17 @@ class BaseCore():
 
         content = {"identification": identification}
         subject = ClusterControllingSubjects.JOIN_CLUSTER
+        dest = (entrance.ip, entrance.port)
 
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          type=PktTypes.CTRL,
-                         dest=entrance,
+                         dest=dest,
                          subject=subject,
                          content=content,
                      )
         pkt.next_hop = (entrance.ip, entrance.port)
+        pkt = self.protocol_wrapper.wrap(pkt)
 
         NodeContext.pkt_mgr.repeat_pkt(pkt)
         logger.info(
@@ -240,6 +242,7 @@ class BaseCore():
                          content=content,
                      )
         pkt.next_hop = (entrance.ip, entrance.port)
+        pkt = self.protocol_wrapper.wrap(pkt)
 
         NodeContext.pkt_mgr.repeat_pkt(pkt)
         logger.info(

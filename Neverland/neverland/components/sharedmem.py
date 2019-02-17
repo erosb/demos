@@ -878,7 +878,15 @@ class SharedMemoryManager():
             raise SHMWorkerNotConnected(MSG_NOT_CONNECTED)
 
         data = json.dumps(request_args).encode('utf-8')
-        conn.socket.sendto(data, self.worker_socket_path)
+        try:
+            conn.socket.sendto(data, self.worker_socket_path)
+        except (ConnectionRefusedError, FileNotFoundError):
+            err_msg = (
+                f'Connection to {self.worker_socket_path} '
+                f'failed, seems SHM worker is not running.'
+            )
+            logger.error(err_msg)
+            raise SharedMemoryError(err_msg)
 
     def read_response(self, conn_id):
         ''' read responses from the worker

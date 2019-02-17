@@ -19,7 +19,7 @@
 	},
 
 	"shm": {
-		"socket_dir": "/tmp/nl_shm",
+		"socket_dir": "/tmp/nl-shm",
 		"manager_socket_name": "manager"
 	},
 
@@ -37,7 +37,7 @@
 	},
 
 	"cluster_entrance": {
-		"ip": "192.168.122.22",
+		"ip": "127.0.0.1",
 		"port": 17151
 	}
 }

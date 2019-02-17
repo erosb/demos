@@ -119,13 +119,7 @@ def src_calculator(pkt, header_fmt, body_fmt):
     ''' calculator for the src field
     '''
 
-    core = NodeContext.core
-    if core is None:
-        raise RuntimeError('NodeContext not created')
-
-    local_ip = get_localhost_ip()
-    port = self.main_afferent.listen_port
-    return (local_ip, port)
+    return (NodeContext.local_ip, NodeContext.listen_port)
 
 
 def sn_calculator(pkt, header_fmt, body_fmt):
@@ -244,7 +238,16 @@ class BaseProtocolWrapper():
         :return: neverland.pkt.UDPPacket object
         '''
 
-        pkt_fmt = self._body_fmt_mapping.get(pkt.type)
+        _type = pkt.fields.type
+        if _type is None:
+            raise PktWrappingError('packet.fields.type is not specified')
+
+        pkt_fmt = self._body_fmt_mapping.get(_type)
+        if pkt_fmt is None:
+            raise PktWrappingError(f'Unknown packet type: {_type}')
+
+        pkt.type = _type
+
         udp_data = self.make_udp_pkt(pkt, pkt_fmt)
         pkt.data = udp_data
         return pkt
@@ -304,6 +307,8 @@ class BaseProtocolWrapper():
                         f'return a valid value'
                     )
 
+                pkt.fields.__update__(**{field_name: value})
+
                 fragment = self._pack_field(value, definition.type)
                 pkt.byte_fields.__update__(**{field_name: fragment})
 
@@ -332,7 +337,7 @@ class BaseProtocolWrapper():
             return struct.pack('Q', value)
         if field_type == FieldTypes.STRUCT_IPV4_SA:
             # ipv4 socket address should in the following format: (ip, port)
-            ip, port = value
+            ip, port = value[0], value[1]
             ip = [int(u) for u in ip.split('.')]
             return struct.pack('!BBBBH', *ip, port)
         if field_type == FieldTypes.STRUCT_IPV6_SA:
@@ -350,6 +355,9 @@ class BaseProtocolWrapper():
         if field_type == FieldTypes.PY_DICT:
             if isinstance(value, dict):
                 data = json.dumps(value)
+                return data.encode()
+            elif isinstance(value, ObjectifiedDict):
+                data = json.dumps(value.__to_dict__())
                 return data.encode()
             else:
                 raise PktWrappingError(

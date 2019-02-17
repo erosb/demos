@@ -123,7 +123,13 @@ class SpecialPacketManager():
     def store_pkt(self, pkt, need_repeat=False, max_rpt_times=5):
         sn = pkt.fields.sn
         type_ = pkt.fields.type
+
+        # The salt field bytes, so we cannot serialize it in a JSON.
+        # Currently, this field is not containing infomation so we can
+        # simply set it to None, and it will be filled again in wrapping.
         fields = pkt.fields.__to_dict__()
+        fields['salt'] = None
+
         previous_hop = list(pkt.previous_hop)
         next_hop = list(pkt.next_hop)
 
@@ -151,7 +157,7 @@ class SpecialPacketManager():
 
         hex_type = Converter.int_2_hex(type_)
         logger.debug(
-            f'Stored a special packet, need_repeat: {need_repeat}'
+            f'Stored a special packet, need_repeat: {need_repeat}, '
             f'sn: {sn}, type: {hex_type}, dest: {pkt.fields.dest}'
         )
 
@@ -268,7 +274,7 @@ class SpecialPacketRepeater():
         self.pkt_mgr.init_shm()
 
     def close_shm(self):
-        self.shm_mgr.disconnect()
+        self.pkt_mgr.close_shm()
 
     def shutdown(self):
         self.__running = False
