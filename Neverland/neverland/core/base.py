@@ -112,11 +112,12 @@ class BaseCore():
         self.shm_mgr.connect(
             self.SHM_SOCKET_NAME_TEMPLATE % NodeContext.pid
         )
-        self.shm_mgr.create_key(
+
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.SHM_KEY_CORE_ID,
             SHMContainerTypes.LIST,
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.SHM_KEY_CTRL_STATUS,
             SHMContainerTypes.INT,
             ClusterControllingStatus.INIT,
@@ -135,7 +136,7 @@ class BaseCore():
             resp = self.shm_mgr.lock_key(self.SHM_KEY_CORE_ID)
         except SHMResponseTimeout:
             # Currently, SHM_MAX_BLOCKING_TIME is 4 seconds and
-            # these works can definitely be done in 4 seconds.
+            # these works can be definitely done in 4 seconds.
             # If a SHMResponseTimeout occurred, then there must
             # be a deadlock
             raise SHMResponseTimeout(

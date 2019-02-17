@@ -40,6 +40,10 @@ class SharedMemoryError(Exception):
     pass
 
 
+class SHMRequestFailed(SharedMemoryError):
+    pass
+
+
 class SHMContainerLocked(SharedMemoryError):
     pass
 

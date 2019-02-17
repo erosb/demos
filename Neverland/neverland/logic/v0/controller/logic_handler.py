@@ -68,7 +68,7 @@ class ControllerLogicHandler(BaseLogicHandler):
         self.shm_mgr.connect(
             self.SHM_SOCKET_NAME_TEMPLATE % NodeContext.pid
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.SHM_KEY_CLUSTER_NODES,
             SHMContainerTypes.DICT,
         )

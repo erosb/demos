@@ -11,6 +11,7 @@ from neverland.exceptions import (
     DropPacket,
     AddressAlreadyInUse,
     SharedMemoryError,
+    SHMRequestFailed,
     SHMContainerLocked,
     SHMRequestBacklogged,
     SHMResponseTimeout,
@@ -201,7 +202,8 @@ MSG_TIMEOUT = 'SharedMemoryManager worker timeout'
 
 class Actions(metaclass=MetaEnum):
 
-    # create a new key value pair, this will override the existing value
+    # Create a new container with the given key. If the container is already
+    # existing, then the request will fail with status 0x10 KEY_CONFLICT
     CREATE = 0x01
 
     # read value from a key
@@ -254,6 +256,9 @@ class ReturnCodes(metaclass=MetaEnum):
 
     # request completed successfully
     OK = 0x00
+
+    # The given key is already existing
+    KEY_CONFLICT = 0x10
 
     # The container which client side is accessing dose not exists
     KEY_ERROR = 0x11
@@ -331,7 +336,8 @@ class SharedMemoryManager():
 
         :param config: the config
         :param sensitive: The sensitive mode will make the client become
-                          sensitive, it will raise an SharedMemoryError
+                          sensitive, it will raise an SHMRequestFailed
+                          exception with a return code in exception.args[0]
                           when the request is not successful.
         '''
 
@@ -526,9 +532,17 @@ class SharedMemoryManager():
 
     def handle_create(self, data):
         key = data.key
+        conn_id = data.conn_id
+
+        if key in self.resources:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_CONFLICT,
+            )
+
         type_ = data.type
         value = data.value
-        conn_id = data.conn_id
         compatible_type = COMPATIBLE_TYPE_MAPPING.get(type_)
 
         if value is not None and (
@@ -906,10 +920,8 @@ class SharedMemoryManager():
                 raise ValueError
 
             if not data.get('succeeded') and self.sensitive:
-                formated_data = json.dumps(data, indent=4)
-                raise SharedMemoryError(
-                    f'SHM Request unsuccessful, response: \n{formated_data}\n'
-                )
+                rcode = data.get('rcode')
+                raise SHMRequestFailed(rcode)
 
             return data
         except socket.timeout:
@@ -1022,6 +1034,17 @@ class SharedMemoryManager():
             backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
+
+    def create_key_and_ignore_conflict(self, *args, **kwargs):
+        ''' invoke self.create_key and ignore the KEY_CONFLICT fault
+        '''
+
+        try:
+            self.create_key(*args, **kwargs)
+        except SHMRequestFailed as e:
+            rcode = e.args[0]
+            if rcode != ReturnCodes.KEY_CONFLICT:
+                raise e
 
     def set_value(self, key, value, backlogging=True):
         ''' change the value of a key

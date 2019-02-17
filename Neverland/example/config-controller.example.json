@@ -1,7 +1,7 @@
 {
 	"basic": {
 		"node_id": 1,
-		"worker_amount": 4,
+		"worker_amount": 8,
 		"pid_file": "/tmp/nl_master.pid"
 	},
 

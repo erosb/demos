@@ -92,27 +92,27 @@ class SpecialPacketManager():
         self.shm_mgr.connect(
             self.SHM_SOCKET_NAME_TEMPLATE % os.getpid()
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.shm_key_pkts,
             SHMContainerTypes.DICT,
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.shm_key_pkts_to_repeat,
             SHMContainerTypes.LIST,
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.shm_key_last_repeat_time,
             SHMContainerTypes.DICT,
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.shm_key_next_repeat_time,
             SHMContainerTypes.DICT,
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.shm_key_max_repeat_times,
             SHMContainerTypes.DICT,
         )
-        self.shm_mgr.create_key(
+        self.shm_mgr.create_key_and_ignore_conflict(
             self.shm_key_repeated_times,
             SHMContainerTypes.DICT,
         )

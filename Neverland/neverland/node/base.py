@@ -379,7 +379,7 @@ class BaseNode():
         NodeContext.protocol_wrapper = None
 
         pid = os.getpid()
-        logger.debug('Worker {pid} cleaned NodeContext')
+        logger.debug(f'Worker {pid} cleaned NodeContext')
 
     def join_cluster(self):
         if self.role == Roles.CONTROLLER:
