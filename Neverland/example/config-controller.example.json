@@ -1,8 +1,8 @@
 {
 	"basic": {
 		"node_id": 1,
-		"worker_amount": 8,
-		"pid_file": "/tmp/nl_master.pid"
+		"worker_amount": 1,
+		"pid_file": "/tmp/nl_ctrl.pid"
 	},
 
 	"net": {
