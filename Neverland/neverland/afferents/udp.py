@@ -3,8 +3,12 @@
 
 import socket
 import struct
+import logging
 
 from neverland.pkt import UDPPacket
+
+
+logger = logging.getLogger('Main')
 
 
 UDP_BUFFER_SIZE = 65507

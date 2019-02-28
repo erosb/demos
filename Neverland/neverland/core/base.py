@@ -195,7 +195,11 @@ class BaseCore():
 
         logger.info('Trying to join cluster...')
 
-        content = {"identification": identification}
+        content = {
+            'identification': identification,
+            'ip': get_localhost_ip(),
+            'listen_port': self.config.net.aff_listen_port,
+        }
         subject = ClusterControllingSubjects.JOIN_CLUSTER
         dest = (entrance.ip, entrance.port)
 
@@ -255,7 +259,6 @@ class BaseCore():
 
     def handle_pkt(self, pkt):
         pkt = self.protocol_wrapper.unwrap(pkt)
-
         if not pkt.valid:
             return
 
@@ -269,6 +272,7 @@ class BaseCore():
 
     def _poll(self):
         events = self._epoll.poll(POLL_TIMEOUT)
+
         for fd, evt in events:
             afferent = self.afferent_mapping[fd]
 
@@ -281,6 +285,12 @@ class BaseCore():
 
     def run(self):
         self.__running = True
+
+        self.main_afferent.listen()
+        addr = self.main_afferent.listen_addr
+        port = self.main_afferent.listen_port
+        logger.info(f'Main afferent is listening on {addr}:{port}')
+
         while self.__running:
             self._poll()
 
@@ -294,6 +304,14 @@ class BaseCore():
         poll_times will be ignored
         '''
 
+        if duration is None and polling_times is None:
+            raise ArgumentError('no argument passed')
+
+        self.main_afferent.listen()
+        addr = self.main_afferent.listen_addr
+        port = self.main_afferent.listen_port
+        logger.info(f'Main afferent is listening on {addr}:{port}')
+
         if duration is not None:
             starting_time = time.time()
             while time.time() - starting_time <= duration:
@@ -301,8 +319,6 @@ class BaseCore():
         elif polling_times is not None:
             for _ in polling_times:
                 self._poll()
-        else:
-            raise ArgumentError('no argument passed')
 
     def shutdown(self):
         self.__running = False

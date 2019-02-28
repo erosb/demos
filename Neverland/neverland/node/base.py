@@ -259,12 +259,21 @@ class BaseNode():
             logger.info(f'Started SharedMemoryManager: {pid}')
 
     def _start_pkt_rpter(self):
+        '''
+        The Repeater needs some components from the node,
+        so we shouldn't use this method before components are initialized
+        '''
+
         pid = os.fork()
         if pid == -1:
             raise OSError('fork failed')
         elif pid == 0:
             self._sig_pkt_rpter_worker()
-            self.pkt_rpter = SpecialPacketRepeater(self.config)
+            self.pkt_rpter = SpecialPacketRepeater(
+                                 self.config,
+                                 self.efferent,
+                                 self.protocol_wrapper,
+                             )
 
             try:
                 self.pkt_rpter.init_shm()
@@ -279,7 +288,11 @@ class BaseNode():
 
             sys.exit(0)  # the sub-process ends here
         else:
-            self.pkt_rpter = SpecialPacketRepeater(self.config)
+            self.pkt_rpter = SpecialPacketRepeater(
+                                 self.config,
+                                 self.efferent,
+                                 self.protocol_wrapper,
+                             )
             self.pkt_rpter_worker_pid = pid
             logger.info(f'Started SpecialPacketRepeater: {pid}')
 

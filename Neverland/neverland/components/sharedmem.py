@@ -1095,11 +1095,16 @@ class SharedMemoryManager():
         :param value_key: the key of a value in a container
         '''
 
+        # value_key arguments in integer will be automatically converted into
+        # strings in the JSON serialization. We can use integers as a dict key
+        # in Python dicts but it's invalid in JSON. The SHM client communicates
+        # with the SHM worker by transporting JSONs, so we have to convert
+        # value_key arguments in integer into strings here.
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.GET,
             key=key,
-            value_key=value_key,
+            value_key=str(value_key),
             backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)
@@ -1117,11 +1122,17 @@ class SharedMemoryManager():
                        of keys in the dict container.
         '''
 
+        try:
+            vl = list(values)
+        except TypeError:
+            # TypeError means values is not iterable
+            vl = [values]
+
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.REMOVE,
             key=key,
-            value=list(values),
+            value=vl,
             backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)

@@ -301,6 +301,7 @@ class BaseProtocolWrapper():
 
             if value is None:
                 value = definition.calculator(pkt, self.header_fmt, body_fmt)
+
                 if value is None:
                     raise PktWrappingError(
                         f'Field {field_name}: calculator {calculator} doesn\'t '
@@ -377,7 +378,7 @@ class BaseProtocolWrapper():
             pkt.byte_fields = byte_fields
             pkt.type = fields.type
             pkt.valid = True
-        except InvalidPkt:
+        except InvalidPkt as e:
             pkt.fields = None
             pkt.byte_fields = None
             pkt.valid = False

@@ -3,7 +3,8 @@
 
 import logging
 
-from neverland.pkt import PktTypes
+from neverland.pkt import PktTypes, UDPPacket
+from neverland.utils import ObjectifiedDict
 from neverland.node import Roles
 from neverland.node.context import NodeContext
 from neverland.logic.v0.base import BaseLogicHandler
@@ -132,7 +133,7 @@ class ControllerLogicHandler(BaseLogicHandler):
         all_nodes = self.get_cluster_nodes()
 
         return {
-            {identification: node_info}
+            identification: node_info
             for identification, node_info in all_nodes.items()
             if node_info.get('role') == Roles.RELAY
         }
@@ -167,17 +168,30 @@ class ControllerLogicHandler(BaseLogicHandler):
         '''
 
         content = pkt.fields.content
-        identification = content.get('identification')
-        node_ip = content.get('ip')
-        node_port = content.get('listen_port')
 
-        node_definition = self.configured_cluster_nodes.get(identification)
+        if content is None:
+            raise DropPacket
+
+        identification = content.identification
+        node_ip = content.ip
+        node_port = content.listen_port
+
+        if (
+            identification is None or
+            node_ip is None or
+            node_port is None
+        ):
+            raise DropPacket
+
+        logger.debug('Start to handle logic 0x01 <join cluster>')
+
+        node_definition = self.configured_cluster_nodes.__get__(identification)
 
         if node_definition is None:
             permitted = False
         else:
-            configured_ip = node_definition.get('ip')
-            configured_role = node_definition.get('role')
+            configured_ip = node_definition.ip
+            configured_role = node_definition.role
 
             if configured_ip == node_ip:
                 permitted = True
@@ -187,7 +201,15 @@ class ControllerLogicHandler(BaseLogicHandler):
                     node_port,
                     getattr(Roles, configured_role),  # it's verified
                 )
+                logger.info(
+                    f'Permitted a request of joining the cluster, '
+                    f'node_ip: {node_ip}, node_port: {node_port}'
+                )
             else:
+                logger.info(
+                    f'Rejected a request of joining the cluster, '
+                    f'node_ip: {node_ip}, node_port: {node_port}'
+                )
                 permitted = False
 
         content = {

@@ -4,6 +4,7 @@
 import logging
 
 from neverland.pkt import PktTypes
+from neverland.utils import ObjectifiedDict
 from neverland.node.context import NodeContext
 from neverland.exceptions import (
     DropPacket,
@@ -52,12 +53,12 @@ class BaseLogicHandler(_BaseLogicHandler):
         '''
 
         content = resp_pkt.fields.content
-        if not isinstance(content, dict):
-            return
+        if not isinstance(content, ObjectifiedDict):
+            raise DropPacket
 
-        responding_sn = content.get('responding_sn')
+        responding_sn = content.responding_sn
         if responding_sn is None:
-            return
+            raise DropPacket
 
         pkt_mgr = NodeContext.pkt_mgr
         pkt = pkt_mgr.get_pkt(responding_sn)
@@ -67,7 +68,7 @@ class BaseLogicHandler(_BaseLogicHandler):
                 f'Packet manager can\'t find the original pkt, sn: {sn}. '
                 f'Drop the response packet.'
             )
-            return
+            raise DropPacket
 
         if pkt.fields.type == PktTypes.CTRL:
             if pkt.fields.subject == ClusterControllingSubjects.JOIN_CLUSTER:
@@ -77,9 +78,9 @@ class BaseLogicHandler(_BaseLogicHandler):
 
     def handle_resp_0x01_join_cluster(self, pkt, resp_pkt):
         resp_content = resp_pkt.fields.content
-        resp_body = content.get('body')
+        resp_body = resp_content.body
 
-        if resp_body.get('permitted'):
+        if resp_body.permitted:
             raise SuccessfullyJoinedCluster
         else:
             raise FailedToJoinCluster

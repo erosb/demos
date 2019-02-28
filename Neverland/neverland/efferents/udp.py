@@ -45,7 +45,10 @@ class UDPTransmitter():
         :param pkt: neverland.pkt.UDPPacket object
         '''
 
-        self._sock.sendto(
-            pkt.data,
-            pkt.next_hop,
-        )
+        data = pkt.data
+        target = pkt.next_hop
+
+        if isinstance(target, list):
+            target = tuple(target)
+
+        self._sock.sendto(data, target)

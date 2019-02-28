@@ -72,7 +72,7 @@ class SpecialPacketManager():
 
     def __init__(self, config):
         self.config = config
-        self.pid = os.getpid()
+        self.pid = NodeContext.pid
 
         self.shm_key_pkts = SHM_KEY_PKTS
 
@@ -154,6 +154,7 @@ class SpecialPacketManager():
         if need_repeat:
             self.shm_mgr.add_value(self.shm_key_pkts_to_repeat, [sn])
             self.set_pkt_max_repeat_times(sn, max_rpt_times)
+            self.set_pkt_repeated_times(sn, 0)
 
         hex_type = Converter.int_2_hex(type_)
         logger.debug(
@@ -163,16 +164,21 @@ class SpecialPacketManager():
 
     def get_pkt(self, sn):
         shm_data = self.shm_mgr.get_value(self.shm_key_pkts, sn)
-        value = shm_data.get('value')
+        shm_value = shm_data.get('value')
 
         if shm_value is None:
             return None
 
+        fields = shm_value.get('fields')
+        fields.update(
+            salt=os.urandom(self.config.net.crypto.salt_len)
+        )
+
         return UDPPacket(
-            type=value.get('type'),
-            fields=value.get('fields'),
-            previous_hop=value.get('previous_hop'),
-            next_hop=value.get('next_hop'),
+            fields=fields,
+            type=shm_value.get('type'),
+            previous_hop=shm_value.get('previous_hop'),
+            next_hop=shm_value.get('next_hop'),
         )
 
     def remove_pkt(self, sn):
@@ -253,10 +259,18 @@ class SpecialPacketRepeater():
     we made it standalone, but it still work together with the packet manager.
     '''
 
-    def __init__(self, config, interval_args=(0.5, 1)):
+    def __init__(
+        self,
+        config,
+        efferent,
+        protocol_wrapper,
+        interval_args=(0.5, 1),
+    ):
         ''' Constructor
 
         :param config: the config instance
+        :param efferent: an instance of the Efferents
+        :param protocol_wrapper: an instance of ProtocolWrappers
         :param interval_args: a pair of number in tuple or list format
                               that will be used in random.uniform to
                               generate a random interval time
@@ -267,8 +281,8 @@ class SpecialPacketRepeater():
         self.interval_args = interval_args
 
         self.pkt_mgr = SpecialPacketManager(config)
-        self.efferent = NodeContext.main_efferent
-        self.protocol_wrapper = NodeContext.protocol_wrapper
+        self.efferent = efferent
+        self.protocol_wrapper = protocol_wrapper
 
     def init_shm(self):
         self.pkt_mgr.init_shm()
@@ -313,6 +327,7 @@ class SpecialPacketRepeater():
 
             for sn in sn_list:
                 pkt = self.pkt_mgr.get_pkt(sn)
+
                 if pkt is None:
                     # packet removed in the interval of these 2 times of shared
                     # memory request, so we just need to skip

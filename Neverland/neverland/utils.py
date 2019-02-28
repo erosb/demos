@@ -40,9 +40,7 @@ class ObjectifiedDict():
 
     def __init__(self, **kwargs):
         object.__setattr__(self, '__container__', dict())
-        for key, value in kwargs.items():
-            a = self.__convert__(value)
-            self.__container__[key] = a
+        self.__update__(**kwargs)
 
     def __update__(self, **kwargs):
         for key, value in kwargs.items():
@@ -56,6 +54,9 @@ class ObjectifiedDict():
     def __bool__(self):
         return bool(self.__container__)
 
+    def __get__(self, key):
+        return self.__container__.get(key)
+
     def __clear__(self):
         self.__container__.clear()
 
@@ -67,9 +68,9 @@ class ObjectifiedDict():
             return item.__to_dict__(keep_bytes)
         elif item.__class__ in (list, tuple, set):
             return [ObjectifiedDict.__to_dumpable__(unit) for unit in item]
-        elif item.__class__ == bool:
+        elif item.__class__ in (bool, None):
             return item
-        elif item.__class__ not in (int, str, None):
+        elif item.__class__ not in (int, float, str):
             return str(item)
 
         return item

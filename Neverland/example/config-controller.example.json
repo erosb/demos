@@ -19,19 +19,19 @@
 	},
 
 	"shm": {
-		"socket_dir": "/tmp/nl-shm",
+		"socket_dir": "/tmp/nl-ctrl/shm",
 		"manager_socket_name": "SHM-Manager.socket"
 	},
 
 	"log": {
 		"main": {
 			"level": "debug",
-			"path": "/tmp/nl-log/nl.log",
+			"path": "/tmp/nl-ctrl/log/nl.log",
 			"stdout": true
 		},
 		"shm": {
 			"level": "debug",
-			"path": "/tmp/nl-log/shm.log",
+			"path": "/tmp/nl-ctrl/log/shm.log",
 			"stdout": true
 		}
 	},
