@@ -12,7 +12,7 @@ from neverland.pkt import UDPPacket
 from neverland.utils import Converter
 from neverland.exceptions import InvalidPkt, SharedMemoryError
 from neverland.node.context import NodeContext
-from neverland.components.sharedmem import (
+from neverland.components.shm import (
     SharedMemoryManager,
     SHMContainerTypes,
 )

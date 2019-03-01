@@ -24,7 +24,7 @@ from neverland.exceptions import (
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.core.status import ClusterControllingStatus
 from neverland.components.idgeneration import IDGenerator
-from neverland.components.sharedmem import (
+from neverland.components.shm import (
     ReturnCodes,
     SHMContainerTypes,
     SharedMemoryManager,

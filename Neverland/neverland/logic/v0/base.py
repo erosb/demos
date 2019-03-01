@@ -13,7 +13,7 @@ from neverland.exceptions import (
 )
 from neverland.logic.base import BaseLogicHandler as _BaseLogicHandler
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
-from neverland.components.sharedmem import SharedMemoryManager
+from neverland.components.shm import SharedMemoryManager
 
 
 logger = logging.getLogger('Logic')

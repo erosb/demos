@@ -37,7 +37,7 @@ from neverland.protocol.v0.fmt import (
     ConnCtrlPktFormat,
 )
 from neverland.components.idgeneration import IDGenerator
-from neverland.components.sharedmem import SharedMemoryManager
+from neverland.components.shm import SharedMemoryManager
 from neverland.components.pktmgmt import (
     SpecialPacketManager,
     SpecialPacketRepeater,

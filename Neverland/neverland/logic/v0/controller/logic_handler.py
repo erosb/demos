@@ -8,7 +8,7 @@ from neverland.utils import ObjectifiedDict
 from neverland.node import Roles
 from neverland.node.context import NodeContext
 from neverland.logic.v0.base import BaseLogicHandler
-from neverland.components.sharedmem import SHMContainerTypes
+from neverland.components.shm import SHMContainerTypes
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.exceptions import (
     ConfigError,
