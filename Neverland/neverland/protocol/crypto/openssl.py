@@ -13,6 +13,16 @@ from ctypes import (
 )
 
 
+''' The OpenSSL Crypto module
+
+libcrypto.so.1.1 is required
+'''
+
+
+EVP_MAX_KEY_LENGTH = 64
+EVP_MAX_IV_LENGTH = 16
+
+
 libcrypto = None
 lib_loaded = False
 
@@ -75,6 +85,16 @@ class OpenSSLCryptor(object):
     ]
 
     def __init__(self, cipher_name, key, iv, mod, libpath='libcrypto.so.1.1'):
+        ''' Constructor
+
+        :param cipher_name: choose from self.supported_ciphers
+        :param key: key argument for EVP_CipherInit_ex
+        :param iv: iv argument for EVP_CipherInit_ex
+        :param mod: mod argument for EVP_CipherInit_ex. 0 or 1,
+                    0 means decrypting and 1 means encrypting,
+        :param libpath: the path to find libcrypto.so
+        '''
+
         if cipher_name not in self.supported_ciphers:
             raise Exception('cipher not supported')
 

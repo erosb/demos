@@ -13,8 +13,11 @@
 		"ipv6": false,
 
 		"crypto": {
+			"lib_path": "/usr/local/lib/libcrypto.so.1.1",
+			"password": "INDESCRIBABLE",
+			"cipher": "aes-256-gcm",
 			"salt_len": 8,
-			"crypto_lib_path": "/usr/local/lib/libcrypto.so.1.1"
+			"iv_duration_range": [1000, 2000]
 		}
 	},
 
