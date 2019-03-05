@@ -39,7 +39,7 @@ def preload_crypto_lib(cipher_name=None, libpath='libcrypto.so.1.1'):
     preload_func(libpath)
 
 
-# tis enough ¯\(ツ)/¯
+# tis enough ¯\_(ツ)_/¯
 def hkdf(password, key_len=16):
     if key_len > MAX_KEY_LEN:
         raise ArgumentError('key length overflows')
@@ -51,7 +51,7 @@ def hkdf(password, key_len=16):
     )[x:].encode()
 
 
-def hdivdf(password, iv_len=8, offset=16):
+def hdivdf(password, iv_len=8):
     ''' Hash-based Default IV Derivation Function
 
     Before we establish the connection and use random IVs, we will need
@@ -63,12 +63,12 @@ def hdivdf(password, iv_len=8, offset=16):
     if iv_len > MAX_IV_LEN:
         raise ArgumentError('key length overflows')
 
-    x0 = (iv_len + offset) * -1
-    x1 = offset * -1
+    pwd_digest = HashTools.sha256(password.encode())
+    x = iv_len * -1
 
     return HashTools.sha256(
-        password.encode()
-    )[x0:x1].encode()
+        pwd_digest.encode()
+    )[x:].encode()
 
 
 class Cryptor(object):

@@ -90,7 +90,7 @@ class SpecialPacketManager():
 
         self.shm_mgr = SharedMemoryManager(self.config)
         self.shm_mgr.connect(
-            self.SHM_SOCKET_NAME_TEMPLATE % os.getpid()
+            self.SHM_SOCKET_NAME_TEMPLATE % self.pid
         )
         self.shm_mgr.create_key_and_ignore_conflict(
             self.shm_key_pkts,
