@@ -22,7 +22,7 @@ from neverland.exceptions import (
     SHMResponseTimeout,
 )
 from neverland.protocol.v0.subjects import ClusterControllingSubjects
-from neverland.core.status import ClusterControllingStatus
+from neverland.core.state import ClusterControllingStates
 from neverland.components.idgeneration import IDGenerator
 from neverland.components.shm import (
     ReturnCodes,
@@ -64,7 +64,7 @@ class BaseCore():
     SHM_KEY_CORE_ID = 'Core_id'
 
     # The shared status of cluster controlling,
-    # enumerated in neverland.core.status.ClusterCtrlStatus
+    # enumerated in neverland.core.state.ClusterControllingStates
     SHM_KEY_CTRL_STATUS = 'Core_CtrlStatus'
 
     def __init__(
@@ -120,7 +120,7 @@ class BaseCore():
         self.shm_mgr.create_key_and_ignore_conflict(
             self.SHM_KEY_CTRL_STATUS,
             SHMContainerTypes.INT,
-            ClusterControllingStatus.INIT,
+            ClusterControllingStates.INIT,
         )
 
         logger.debug(f'init_shm for core of worker {NodeContext.pid} has done')
@@ -219,7 +219,7 @@ class BaseCore():
         )
 
         logger.info('[Node Status] WAITING_FOR_JOIN')
-        self._set_ctrl_status(ClusterControllingStatus.WAITING_FOR_JOIN)
+        self._set_ctrl_status(ClusterControllingStates.WAITING_FOR_JOIN)
 
     def request_to_leave_cluster(self):
         ''' send a request of the node is going to detach from the cluster
@@ -255,7 +255,7 @@ class BaseCore():
         )
 
         logger.info('[Node Status] WAITING_FOR_LEAVE')
-        self._set_ctrl_status(ClusterControllingStatus.WAITING_FOR_LEAVE)
+        self._set_ctrl_status(ClusterControllingStates.WAITING_FOR_LEAVE)
 
     def handle_pkt(self, pkt):
         pkt = self.protocol_wrapper.unwrap(pkt)

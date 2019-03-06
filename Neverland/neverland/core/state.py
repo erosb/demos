@@ -4,7 +4,7 @@
 from neverland.utils import MetaEnum
 
 
-class ClusterControllingStatus(metaclass=MetaEnum):
+class ClusterControllingStates(metaclass=MetaEnum):
 
     # This status means a node has just completed its initialization and
     # about to start working
