@@ -2,7 +2,7 @@
 #coding: utf-8
 
 
-from neverland.utils import ObjectifiedDict
+from neverland.utils import ObjectifiedDict, MetaEnum
 from neverland.communicate.shm import SharedMemoryManager
 from neverland.node.context import NodeContext
 
@@ -20,7 +20,33 @@ the IV.
 
 
 class Connection(ObjectifiedDict):
-    pass
+
+    '''
+    This class is used to contain the context of a connection.
+    It's the entity what the ConnectionManager shall manage.
+
+    Inner data structure:
+        {
+            "remote": {
+                          "ip": str,
+                          "port": int
+                      },
+            "status": int,
+            "iv": bytes,
+            "iv_duration": int
+        }
+    '''
+
+
+class ConnStates(metaclass=MetaEnum):
+
+    INIT = 0x00
+    CONNECTING = 0x01
+
+    CHANGING_IV = 0x11
+
+    USABLE = 0xF0
+    CLOSED = 0xFF
 
 
 class ConnectionManager():
@@ -43,6 +69,7 @@ class ConnectionManager():
     # Data structure:
     #     {
     #         "ip:port": {
+    #             "status": int,
     #             "iv": b64encode(iv),
     #             "iv_duration": int,
     #         }
@@ -60,7 +87,7 @@ class ConnectionManager():
 
         self.shm_mgr = SharedMemoryManager(self.config)
         self.shm_mgr.connect(
-            self.SHM_SOCKET_NAME_TEMPLATE % os.getpid()
+            self.SHM_SOCKET_NAME_TEMPLATE % self.pid
         )
 
         self.shm_key_conns = self.SHM_KEY_TMP_CONNS % self.pid
