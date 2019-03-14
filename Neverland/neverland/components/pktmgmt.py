@@ -3,6 +3,7 @@
 
 import os
 import time
+import base64
 import random
 import socket
 import signal as sig
@@ -124,11 +125,13 @@ class SpecialPacketManager():
         sn = pkt.fields.sn
         type_ = pkt.fields.type
 
-        # The salt field bytes, so we cannot serialize it in a JSON.
-        # Currently, this field is not containing infomation so we can
-        # simply set it to None, and it will be filled again in wrapping.
+        # The salt field is bytes, so we cannot serialize it in a JSON.
+        # So, we shall encode it into a base64 string before store it.
         fields = pkt.fields.__to_dict__()
-        fields['salt'] = None
+        salt = fields.get('salt')
+        if salt is not None:
+            salt_b64 = base64.b64encode(salt).decode()
+            fields.update(salt=salt_b64)
 
         previous_hop = list(pkt.previous_hop)
         next_hop = list(pkt.next_hop)
@@ -169,10 +172,11 @@ class SpecialPacketManager():
         if shm_value is None:
             return None
 
+        # and here, we restore the base64 encoded salt into bytes
         fields = shm_value.get('fields')
-        fields.update(
-            salt=os.urandom(self.config.net.crypto.salt_len)
-        )
+        salt_b64 = fields.get('salt')
+        salt = base64.b64decode(salt_b64)
+        fields.update(salt=salt)
 
         return UDPPacket(
             fields=fields,
