@@ -77,7 +77,7 @@ The protocol of communication:
             container type
 
         value:
-            value of container
+            value for the container
 
         value_key:
             the key of a value in a container
@@ -123,12 +123,22 @@ The protocol of communication:
                 "backlogging": bool,
             }
 
-        if action in [GET]:
+        if action in [DICT_GET]:
             {
                 "conn_id": str,
                 "action": int,
                 "key": str,
                 "value_key": any serializable type in json,
+                "backlogging": bool,
+            }
+
+        if action in [DICT_UPDATE]:
+            {
+                "conn_id": str,
+                "action": int,
+                "key": str,
+                "value_key": any serializable type in json,
+                "value": any serializable type in json,
                 "backlogging": bool,
             }
 
@@ -218,9 +228,11 @@ class Actions(metaclass=MetaEnum):
     # add a new value into a multi-value container
     ADD = 0x04
 
-    # get a single value from a multi-value container
-    # currently, it only supports dict container
-    GET = 0x05
+    # get value from a dict container
+    DICT_GET = 0x05
+
+    # update a dict container
+    DICT_UPDATE = 0x06
 
     # completely remove a key from stored resources
     CLEAN = 0x11
@@ -635,7 +647,7 @@ class SharedMemoryManager():
         except ValueError:
             return self._gen_response_json(conn_id=conn_id, succeeded=False)
 
-    def handle_get(self, data):
+    def handle_dict_get(self, data):
         key = data.key
         value_key = data.value_key
         conn_id = data.conn_id
@@ -659,6 +671,45 @@ class SharedMemoryManager():
             conn_id=conn_id,
             succeeded=True,
             value=container.get(value_key),
+        )
+
+    def handle_dict_update(self, data):
+        key = data.key
+        value_key = data.value_key
+        value = data.value
+        conn_id = data.conn_id
+
+        if key not in self.resources:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
+
+        container = self.get_compatible_value(key)
+        if not isinstance(container, dict):
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.TYPE_ERROR,
+            )
+
+        if value_key not in self.resources:
+            return self._gen_response_json(
+                conn_id=conn_id,
+                succeeded=False,
+                rcode=ReturnCodes.KEY_ERROR,
+            )
+
+        if isinstance(value, ObjectifiedDict):
+            value = value.__to_dict__()
+
+        self.resources[value_key].update(
+            {value_key: value}
+        )
+        return self._gen_response_json(
+            conn_id=conn_id,
+            succeeded=True,
         )
 
     def handle_clean(self, data):
@@ -768,8 +819,10 @@ class SharedMemoryManager():
             return self.handle_set(data)
         if data.action == Actions.ADD:
             return self.handle_add(data)
-        if data.action == Actions.GET:
-            return self.handle_get(data)
+        if data.action == Actions.DICT_GET:
+            return self.handle_dict_get(data)
+        if data.action == Actions.DICT_UPDATE:
+            return self.handle_dict_update(data)
         if data.action == Actions.CLEAN:
             return self.handle_clean(data)
         if data.action == Actions.REMOVE:
@@ -1086,29 +1139,6 @@ class SharedMemoryManager():
         )
         return self.read_response(self.current_connection.conn_id)
 
-    def get_value(self, key, value_key, backlogging=True):
-        ''' get a single value from a the container
-
-        allowed container type: DICT
-
-        :param key: the container key
-        :param value_key: the key of a value in a container
-        '''
-
-        # value_key arguments in integer will be automatically converted into
-        # strings in the JSON serialization. We can use integers as a dict key
-        # in Python dicts but it's invalid in JSON. The SHM client communicates
-        # with the SHM worker by transporting JSONs, so we have to convert
-        # value_key arguments in integer into strings here.
-        self.send_request(
-            conn_id=self.current_connection.conn_id,
-            action=Actions.GET,
-            key=key,
-            value_key=str(value_key),
-            backlogging=backlogging,
-        )
-        return self.read_response(self.current_connection.conn_id)
-
     def remove_value(self, key, values, backlogging=True):
         ''' remove values from the container
 
@@ -1138,6 +1168,9 @@ class SharedMemoryManager():
         return self.read_response(self.current_connection.conn_id)
 
     def read_key(self, key, backlogging=True):
+        ''' read the whole container
+        '''
+
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.READ,
@@ -1147,10 +1180,55 @@ class SharedMemoryManager():
         return self.read_response(self.current_connection.conn_id)
 
     def clean_key(self, key, backlogging=True):
+        ''' completely remove a container
+        '''
+
         self.send_request(
             conn_id=self.current_connection.conn_id,
             action=Actions.CLEAN,
             key=key,
+            backlogging=backlogging,
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def get_dict_value(self, key, value_key, backlogging=True):
+        ''' get a value from a dict container
+
+        allowed container type: DICT
+
+        :param key: the container key
+        :param value_key: key in the dict container
+        '''
+
+        # value_key arguments in integer will be automatically converted into
+        # strings in the JSON serialization. We can use integers as a dict key
+        # in Python dicts but it's invalid in JSON. The SHM client communicates
+        # with the SHM worker by transporting JSONs, so we have to convert
+        # value_key arguments in integer into strings here.
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.DICT_GET,
+            key=key,
+            value_key=str(value_key),
+            backlogging=backlogging,
+        )
+        return self.read_response(self.current_connection.conn_id)
+
+    def update_dict(self, key, dict_key, value, backlogging=True):
+        ''' change a value of a dict container
+
+        allowed container type: DICT
+
+        :param key: the container key
+        :param dict_key: key in the dict container
+        :param value: value for dict.update()
+        '''
+
+        self.send_request(
+            conn_id=self.current_connection.conn_id,
+            action=Actions.DICT_UPDATE,
+            key=key,
+            value=value,
             backlogging=backlogging,
         )
         return self.read_response(self.current_connection.conn_id)

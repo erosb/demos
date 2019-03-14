@@ -49,14 +49,14 @@ Details of connection management:
         | Default IV |
         +------------+
 
-                       +--------------+     +--------------+
-                       | Slot 0       |     | Slot 1       |
-         Removed       |              |     |              |      Incoming
-        +--------+     |  +--------+  |     |  +--------+  |     +--------+
-        | IV n-1 | <-- |  |  IV n  |  | <-- |  | IV n+1 |  | <-- | IV n+2 |
-        +--------+     |  +--------+  |     |  +--------+  |     +--------+
-                       |              |     |              |
-                       +--------------+     +--------------+
+                     +--------------+   +--------------+   +--------------+
+                     | Slot-0       |   | Slot-1       |   | Slot-2       |
+         Removed     |              |   |              |   |              |
+        +--------+   |  +--------+  |   |  +--------+  |   |  +--------+  |
+        | IV n-1 |<--|  |  IV n  |  |<--|  | IV n+1 |  |<--|  |incoming|  |
+        +--------+   |  +--------+  |   |  +--------+  |   |  +--------+  |
+                     |              |   |              |   |   unusable   |
+                     +--------------+   +--------------+   +--------------+
 '''
 
 
@@ -74,8 +74,9 @@ class Connection(ObjectifiedDict):
                       },
             "sn": int,
             "state": int,
+            "slot": str,
             "iv": bytes,
-            "iv_duration": int
+            "iv_duration": int,
         }
 
 
@@ -83,6 +84,7 @@ class Connection(ObjectifiedDict):
         remote: the remote socket address
         sn: the serial number of a conntion
         state: the state of the conection
+        slot: the slot name of this connection
         iv: the IV used in the Cryptor object of this connection
         iv_duration: number of packets that could be encrypted by this IV
                      once the iv_duration is exceeded, a new connection
@@ -115,6 +117,12 @@ class ConnStates(metaclass=MetaEnum):
     REMOVED = 0x04
 
 
+SLOT_0 = 'slot-0'
+SLOT_1 = 'slot-1'
+SLOT_2 = 'slot-2'
+SLOTS = [SLOT_0, SLOT_1, SLOT_2]
+
+
 class ConnectionManager():
 
     ''' The Connection Manager
@@ -135,9 +143,24 @@ class ConnectionManager():
     # Data structure:
     #     {
     #         "ip:port": {
-    #             "status": int,
-    #             "iv": b64encode(iv),
-    #             "iv_duration": int,
+    #             "slot-0": {
+    #                 "status": int,
+    #                 "sn": int,
+    #                 "iv": b64encode(iv),
+    #                 "iv_duration": int,
+    #             },
+    #             "slot-1": {
+    #                 "status": int,
+    #                 "sn": int,
+    #                 "iv": b64encode(iv),
+    #                 "iv_duration": int,
+    #             },
+    #             "slot-2": {
+    #                 "status": int,
+    #                 "sn": int,
+    #                 "iv": b64encode(iv),
+    #                 "iv_duration": int,
+    #             },
     #         }
     #     }
     SHM_KEY_TMP_CONNS = 'ConnectionManager-%d_Conns'
@@ -157,15 +180,84 @@ class ConnectionManager():
         )
 
         self.shm_key_conns = self.SHM_KEY_TMP_CONNS % self.pid
+        self.shm_mgr.create_key_and_ignore_conflict(
+            self.shm_key_conns,
+            SHMContainerTypes.DICT,
+        )
 
-    def connect(self, remote):
-        ''' establish a connection
+    def _get_native_conn_info(self, remote):
+        ''' get the native JSON data of connections
+        '''
+
+        ip = remote[0]
+        port = remote[1]
+        remote_name = f'{ip}:{port}'
+
+        shm_data = self.shm_mgr.get_dict_value(self.shm_key_conns, remote_name)
+        shm_value = shm_data.get('value')
+
+        if shm_value is None:
+            return {
+                SLOT_0: None,
+                SLOT_1: None,
+                SLOT_2: None,
+            }
+        else:
+            return shm_value
+
+    def get_conns(self, remote):
+        ''' get all connections of a remote node
+
+        :param remote: socket address in tuple format, (ip, port)
+        '''
+
+        ip = remote[0]
+        port = remote[1]
+        native_info = self._get_native_conn_info(remote)
+
+        result = dict()
+        for slot_name in SLOTS:
+            conn_info = native_info.get(slot_name)
+
+            if conn_info is None:
+                conn = None
+            else:
+                conn_info.update(
+                    slot=slot_name,
+                    remote={'ip': ip, 'port': port}
+                )
+                conn = Connection(**conn_info)
+
+            result.update(
+                {slot_name: conn}
+            )
+        return result
+
+    def new_conn(self, remote):
+        ''' establish a new connection
+
+        The establishing connection will be placed in slot-2.
+
+        After the new connection is established, if we have established 2
+        connections with the specified node already then the connection in
+        slot-0 will be removed and the connection in slot-1 will be moved
+        to slot-0. The new connection will be placed in slot-1.
 
         :param remote: remote socket address, (ip, port)
         '''
 
-    def disconnect(self, remote):
+    def remove_conn(self, remote, slot):
         ''' close a connection
 
         :param remote: remote socket address, (ip, port)
+        :param slot: slot name, enumerated in SLOTS
         '''
+
+        ip = remote[0]
+        port = remote[1]
+        remote_name = f'{ip}:{port}'
+
+        native_info = self._get_native_conn_info(remote)
+        native_info[slot] = None
+
+        self.shm_mgr.update_dict(remote_name, native_info)

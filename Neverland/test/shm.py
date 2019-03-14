@@ -9,7 +9,7 @@ import unittest
 
 import __code_path__
 from neverland.utils import ObjectifiedDict
-from neverland.components.sharedmem import (
+from neverland.components.shm import (
     SharedMemoryManager,
     SHMContainerTypes,
     ReturnCodes,
@@ -103,6 +103,12 @@ class SHMTest(unittest.TestCase):
 
         for td in DATA:
             print(f'\n==================={td["name"]}===================\n')
+
+            # try to remove this KEY first
+            resp = shm_mgr.clean_key(KEY)
+            if not resp.get('succeeded'):
+                self.assertEqual(resp.get('rcode'), ReturnCodes.KEY_ERROR)
+
             resp = shm_mgr.create_key(KEY, td['type'], td['2_create'])
             print('\n-----------Create-----------')
             print(resp)
