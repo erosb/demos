@@ -21,8 +21,9 @@ from neverland.exceptions import (
     SharedMemoryError,
     SHMResponseTimeout,
 )
-from neverland.protocol.v0.subjects import ClusterControllingSubjects
-from neverland.core.state import ClusterControllingStates
+from neverland.protocol.v0.subjects import\
+        ClusterControllingSubjects as CCSubjects
+from neverland.core.state import ClusterControllingStates as CCStates
 from neverland.components.idgeneration import IDGenerator
 from neverland.components.shm import (
     ReturnCodes,
@@ -65,7 +66,7 @@ class BaseCore():
 
     # The shared status of cluster controlling,
     # enumerated in neverland.core.state.ClusterControllingStates
-    SHM_KEY_CTRL_STATUS = 'Core_CtrlStatus'
+    SHM_KEY_CC_STATE = 'Core_CCState'
 
     def __init__(
         self, config, efferent, logic_handler,
@@ -101,12 +102,16 @@ class BaseCore():
         for afferent in minor_afferents:
             self.plug_afferent(afferent)
 
-    def _set_ctrl_status(self, status):
-        self.shm_mgr.set_value(self.SHM_KEY_CTRL_STATUS, status)
+    def set_cc_state(self, status):
+        self.shm_mgr.set_value(self.SHM_KEY_CC_STATE, status)
 
-    def _get_ctrl_status(self):
-        resp = self.shm_mgr.read_key(self.SHM_KEY_CTRL_STATUS)
+    def get_cc_state(self):
+        resp = self.shm_mgr.read_key(self.SHM_KEY_CC_STATE)
         return resp.get('value')
+
+    @property
+    def cc_state(self):
+        return self.get_cc_state()
 
     def init_shm(self):
         self.shm_mgr.connect(
@@ -118,9 +123,9 @@ class BaseCore():
             SHMContainerTypes.LIST,
         )
         self.shm_mgr.create_key_and_ignore_conflict(
-            self.SHM_KEY_CTRL_STATUS,
+            self.SHM_KEY_CC_STATE,
             SHMContainerTypes.INT,
-            ClusterControllingStates.INIT,
+            CCStates.INIT,
         )
 
         logger.debug(f'init_shm for core of worker {NodeContext.pid} has done')
@@ -200,7 +205,7 @@ class BaseCore():
             'ip': get_localhost_ip(),
             'listen_port': self.config.net.aff_listen_port,
         }
-        subject = ClusterControllingSubjects.JOIN_CLUSTER
+        subject = CCSubjects.JOIN_CLUSTER
         dest = (entrance.ip, entrance.port)
 
         pkt = UDPPacket()
@@ -219,7 +224,7 @@ class BaseCore():
         )
 
         logger.info('[Node Status] WAITING_FOR_JOIN')
-        self._set_ctrl_status(ClusterControllingStates.WAITING_FOR_JOIN)
+        self.set_cc_state(CCStates.WAITING_FOR_JOIN)
 
     def request_to_leave_cluster(self):
         ''' send a request of the node is going to detach from the cluster
@@ -236,7 +241,7 @@ class BaseCore():
         logger.info('Trying to leave cluster...')
 
         content = {"identification": identification}
-        subject = ClusterControllingSubjects.LEAVE_CLUSTER
+        subject = CCSubjects.LEAVE_CLUSTER
 
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
@@ -255,7 +260,7 @@ class BaseCore():
         )
 
         logger.info('[Node Status] WAITING_FOR_LEAVE')
-        self._set_ctrl_status(ClusterControllingStates.WAITING_FOR_LEAVE)
+        self.set_cc_state(CCStates.WAITING_FOR_LEAVE)
 
     def handle_pkt(self, pkt):
         pkt = self.protocol_wrapper.unwrap(pkt)
@@ -284,6 +289,7 @@ class BaseCore():
                 self.handle_pkt(pkt)
 
     def run(self):
+        self.set_cc_state(CCStates.WORKING)
         self.__running = True
 
         self.main_afferent.listen()

@@ -29,7 +29,6 @@ from neverland.logic.v0.controller.logic_handler import ControllerLogicHandler
 from neverland.logic.v0.outlet.logic_handler import OutletLogicHandler
 from neverland.logic.v0.relay.logic_handler import RelayLogicHandler
 from neverland.protocol.v0 import ProtocolWrapper
-from neverland.protocol.v0.subjects import ClusterControllingSubjects
 from neverland.protocol.v0.fmt import (
     HeaderFormat,
     DataPktFormat,

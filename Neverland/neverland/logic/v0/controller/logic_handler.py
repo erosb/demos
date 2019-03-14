@@ -9,7 +9,8 @@ from neverland.node import Roles
 from neverland.node.context import NodeContext
 from neverland.logic.v0.base import BaseLogicHandler
 from neverland.components.shm import SHMContainerTypes
-from neverland.protocol.v0.subjects import ClusterControllingSubjects
+from neverland.protocol.v0.subjects import\
+        ClusterControllingSubjects as CCSubjects
 from neverland.exceptions import (
     ConfigError,
     DropPacket,
@@ -82,7 +83,7 @@ class ControllerLogicHandler(BaseLogicHandler):
                               type=PktTypes.CTRL,
                               src=src,
                               dest=dest,
-                              subject=ClusterControllingSubjects.RESPONSE,
+                              subject=CCSubjects.RESPONSE,
                               content=content,
                           )
 
@@ -154,11 +155,11 @@ class ControllerLogicHandler(BaseLogicHandler):
         ]
 
     def handle_ctrl_request(self, pkt):
-        if pkt.fields.subject == ClusterControllingSubjects.JOIN_CLUSTER:
+        if pkt.fields.subject == CCSubjects.JOIN_CLUSTER:
             return self.handle_0x01_join_cluster(pkt)
-        elif pkt.fields.subject == ClusterControllingSubjects.LEAVE_CLUSTER:
+        elif pkt.fields.subject == CCSubjects.LEAVE_CLUSTER:
             return self.handle_0x02_leave_cluster(pkt)
-        elif pkt.fields.subject == ClusterControllingSubjects.READ_CLUSTER_CONFIG:
+        elif pkt.fields.subject == CCSubjects.READ_CLUSTER_CONFIG:
             return self.handle_0x11_reading_config(pkt)
         else:
             raise DropPacket

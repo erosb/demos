@@ -6,13 +6,15 @@ import logging
 from neverland.pkt import PktTypes
 from neverland.utils import ObjectifiedDict
 from neverland.node.context import NodeContext
+from neverland.core.state import ClusterControllingStates as CCStates
 from neverland.exceptions import (
     DropPacket,
     FailedToJoinCluster,
     SuccessfullyJoinedCluster,
 )
 from neverland.logic.base import BaseLogicHandler as _BaseLogicHandler
-from neverland.protocol.v0.subjects import ClusterControllingSubjects
+from neverland.protocol.v0.subjects import\
+        ClusterControllingSubjects as CCSubjects
 from neverland.components.shm import SharedMemoryManager
 
 
@@ -33,11 +35,14 @@ class BaseLogicHandler(_BaseLogicHandler):
         ''' handle packets with type flag 0x01 DATA
         '''
 
+        if NodeContext.core.cc_state != CCStates.WORKING:
+            raise DropPacket
+
     def handle_ctrl(self, pkt):
         ''' handle packets with type flag 0x02 CTRL
         '''
 
-        if pkt.fields.subject == ClusterControllingSubjects.RESPONSE:
+        if pkt.fields.subject == CCSubjects.RESPONSE:
             return self.handle_ctrl_response(pkt)
         else:
             return self.handle_ctrl_request(pkt)
@@ -71,22 +76,27 @@ class BaseLogicHandler(_BaseLogicHandler):
             raise DropPacket
 
         if pkt.fields.type == PktTypes.CTRL:
-            if pkt.fields.subject == ClusterControllingSubjects.JOIN_CLUSTER:
+            if pkt.fields.subject == CCSubjects.JOIN_CLUSTER:
                 self.handle_resp_0x01_join_cluster(pkt, resp_pkt)
-            if pkt.fields.subject == ClusterControllingSubjects.LEAVE_CLUSTER:
+            if pkt.fields.subject == CCSubjects.LEAVE_CLUSTER:
                 self.handle_resp_0x02_leave_cluster(pkt, resp_pkt)
 
     def handle_resp_0x01_join_cluster(self, pkt, resp_pkt):
+        if NodeContext.core.cc_state != CCStates.WAITING_FOR_JOIN:
+            raise DropPacket
+
         resp_content = resp_pkt.fields.content
         resp_body = resp_content.body
 
         if resp_body.permitted:
+            NodeContext.core.set_cc_state(CCStates.JOINED_CLUSTER)
             raise SuccessfullyJoinedCluster
         else:
             raise FailedToJoinCluster
 
     def handle_resp_0x02_leave_cluster(self, pkt, resp_pkt):
-        pass
+        if NodeContext.core.cc_state != CCStates.WAITING_FOR_LEAVE:
+            raise DropPacket
 
     def handle_conn_ctrl(self, pkt):
         pass
