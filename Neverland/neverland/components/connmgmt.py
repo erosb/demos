@@ -10,13 +10,53 @@ from neverland.node.context import NodeContext
 ''' The connection management module
 
 Nodes in the Neverland cluster shall complete a fake connection before
-they start to communicate with each other.
+they start to communicate with each other. Within establishing this
+connection, the initiator shall send an IV to the recipient. And then,
+they will use this IV in encryption. So, actually the connection is
+bound with the encryption, connections are like channels with unique
+IVs that link nodes into a web.
 
-Due to we only transport UDP packets in the cluster, so we call this
-connection as "a fake connection". It's not like the TCP connection.
-The only thing we need to do is send an IV to the recipient and comfirm
-the recipient has recived the IV. And then, this IV will be used in
-the encryption of the established connection.
+
+Details of connection management:
+    The connection is node-to-node but not core-to-core, but all
+    functionalities of communication is in the core and one node
+    may have multiple cores (in multiple workers). So this means
+    we need to build the connection on node layer and all core
+    objects in the node shall share it.
+
+    Due to the limitation of SharedMemoryManager's implementation,
+    we cannot simply share the Cryptor object between cores.
+
+    So the solution is sharing IV and IV duration between cores.
+
+    At the initial stage of a node, each node have a default IV that
+    derived from the password. This IV will be used to establish the
+    initial connection. After it, the initial IV will be placed aside
+    and the node will start to communicate with other node with the
+    new IV of initial connection. Once the IV of initial connection
+    exceeds its duration, next connection will be established with the
+    last IV, but the last connection and its IV will not be removed
+    immediately, it will be kept until the third connection is established.
+
+    During the whole process, we will keep at most 2 connections between
+    2 nodes and once the third connection is established, the first one
+    will be removed. And the default IV will never be removed, it's only
+    used to establish the initial connection.
+
+    So, the mind mapping is like this:
+
+        +------------+
+        | Default IV |
+        +------------+
+
+                       +--------------+     +--------------+
+                       | Slot 0       |     | Slot 1       |
+         Removed       |              |     |              |      Incoming
+        +--------+     |  +--------+  |     |  +--------+  |     +--------+
+        | IV n-1 | <-- |  |  IV n  |  | <-- |  | IV n+1 |  | <-- | IV n+2 |
+        +--------+     |  +--------+  |     |  +--------+  |     +--------+
+                       |              |     |              |
+                       +--------------+     +--------------+
 '''
 
 
@@ -32,22 +72,47 @@ class Connection(ObjectifiedDict):
                           "ip": str,
                           "port": int
                       },
-            "status": int,
+            "sn": int,
+            "state": int,
             "iv": bytes,
             "iv_duration": int
         }
+
+
+    Field Description:
+        remote: the remote socket address
+        sn: the serial number of a conntion
+        state: the state of the conection
+        iv: the IV used in the Cryptor object of this connection
+        iv_duration: number of packets that could be encrypted by this IV
+                     once the iv_duration is exceeded, a new connection
+                     will be established.
     '''
 
 
 class ConnStates(metaclass=MetaEnum):
 
+    ''' Connection States
+    '''
+
+    # The initial state of connection object. When a Connection object
+    # completes its instantiation, the first state is INIT.
     INIT = 0x00
-    CONNECTING = 0x01
 
-    CHANGING_IV = 0x11
+    # This state means a request of establishing connection has been sent
+    # to the remote, and we are waiting for the response.
+    ESTABLISHING = 0x01
 
-    USABLE = 0xF0
-    CLOSED = 0xFF
+    # This state means we have received the response of the connection
+    # establishing request, and the remote has accepted the connection.
+    ESTABLISHED = 0x02
+
+    # This state means the IV of this connection has exceeds its duration and
+    # a new connection is establishing. This connection will be removed soon.
+    REMOVING = 0x03
+
+    # This state means the connection has been removed.
+    REMOVED = 0x04
 
 
 class ConnectionManager():
