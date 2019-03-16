@@ -90,6 +90,7 @@ class BaseLogicHandler(_BaseLogicHandler):
 
         if resp_body.permitted:
             NodeContext.core.set_cc_state(CCStates.JOINED_CLUSTER)
+            NodeContext.pkt_mgr.cancel_repeat(pkt.fields.sn)
             raise SuccessfullyJoinedCluster
         else:
             raise FailedToJoinCluster

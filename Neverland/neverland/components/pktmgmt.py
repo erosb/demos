@@ -202,6 +202,9 @@ class SpecialPacketManager():
         self.shm_mgr.remove_value(self.shm_key_next_repeat_time, sn)
         self.shm_mgr.remove_value(self.shm_key_max_repeat_times, sn)
         self.shm_mgr.remove_value(self.shm_key_repeated_times, sn)
+        logger.debug(
+            f'Cancelled repeat for a packet, sn: {sn}'
+        )
 
     def repeat_pkt(self, pkt, max_rpt_times=5):
         self.store_pkt(pkt, need_repeat=True, max_rpt_times=max_rpt_times)

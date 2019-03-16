@@ -11,6 +11,7 @@ from neverland.exceptions import ConfigError
 # mapping names of loggers and the keyword of their config
 LOGGER_NAME_CONFIG_KW_MAPPING = {
     'SHM': 'shm',
+    'CONN': 'conn',
 }
 
 MAIN_LOGGER_CONFIG_KW = 'main'

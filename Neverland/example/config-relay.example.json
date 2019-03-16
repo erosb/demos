@@ -36,6 +36,11 @@
 			"level": "debug",
 			"path": "/tmp/nl-relay/log/shm.log",
 			"stdout": true
+		},
+		"conn": {
+			"level": "debug",
+			"path": "/tmp/nl-relay/log/conn.log",
+			"stdout": true
 		}
 	},
 

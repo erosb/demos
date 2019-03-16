@@ -82,3 +82,21 @@ class FailedToJoinCluster(Info):
 
 class FailedToDetachFromCluster(Info):
     pass
+
+
+class ConnError(Exception):
+
+    ''' The base class of connection management error
+    '''
+
+
+class ConnSlotNotAvailable(ConnError):
+
+    ''' Specified slot is not available
+    '''
+
+
+class NoConnAvailable(ConnError):
+
+    ''' No connection available currently
+    '''

@@ -159,6 +159,13 @@ class ConnCtrlPktFormat(BasePktFormat):
     @classmethod
     def gen_fmt(cls, config):
         cls.__fmt__ = {
+            # The flag of whether a node want to keep communicating with
+            # another node. 0x01 for Ture and 0x02 for False
+            'communicating': FieldDefinition(
+                                 length = 1,
+                                 type   = FieldTypes.STRUCT_U_CHAR,
+                             ),
+
             # The flag of whether the iv should be changed
             # 0x01 for Ture and 0x02 for False
             'iv_changed': FieldDefinition(
@@ -174,7 +181,7 @@ class ConnCtrlPktFormat(BasePktFormat):
 
             # The iv
             'iv': FieldDefinition(
-                      length = config.iv_len or 8,
+                      length = config.net.crypto.iv_len or 8,
                       type   = FieldTypes.PY_BYTES,
                   ),
         }

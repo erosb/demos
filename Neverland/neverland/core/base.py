@@ -215,7 +215,7 @@ class BaseCore():
                          subject=subject,
                          content=content,
                      )
-        pkt.next_hop = (entrance.ip, entrance.port)
+        pkt.next_hop = dest
         pkt = self.protocol_wrapper.wrap(pkt)
 
         NodeContext.pkt_mgr.repeat_pkt(pkt)
@@ -242,16 +242,16 @@ class BaseCore():
 
         content = {"identification": identification}
         subject = CCSubjects.LEAVE_CLUSTER
+        dest = (entrance.ip, entrance.port)
 
         pkt = UDPPacket()
         pkt.fields = ObjectifiedDict(
                          type=PktTypes.CTRL,
-                         src=src,
-                         dest=entrance,
+                         dest=dest,
                          subject=subject,
                          content=content,
                      )
-        pkt.next_hop = (entrance.ip, entrance.port)
+        pkt.next_hop = dest
         pkt = self.protocol_wrapper.wrap(pkt)
 
         NodeContext.pkt_mgr.repeat_pkt(pkt)
