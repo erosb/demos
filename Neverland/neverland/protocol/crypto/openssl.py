@@ -12,8 +12,11 @@ from ctypes import (
     create_string_buffer,
 )
 
+from neverland.excpetions import ArgumentError
+from neverland.utils import HashTools
 
-''' The OpenSSL Crypto module
+
+''' The OpenSSL crypto module
 
 libcrypto.so.1.1 is required
 '''
@@ -21,6 +24,11 @@ libcrypto.so.1.1 is required
 
 EVP_MAX_KEY_LENGTH = 64
 EVP_MAX_IV_LENGTH = 16
+
+
+class Mods:
+    DECRYPTING = 0
+    ENCRYPTING = 1
 
 
 libcrypto = None
@@ -84,27 +92,40 @@ class OpenSSLCryptor(object):
         'rc4-hmac-md5',
     ]
 
-    def __init__(self, cipher_name, key, iv, mod, libpath='libcrypto.so.1.1'):
+    def __init__(self, config, mod):
         ''' Constructor
 
-        :param cipher_name: choose from self.supported_ciphers
-        :param key: key argument for EVP_CipherInit_ex
-        :param iv: iv argument for EVP_CipherInit_ex
+        :param config: the config
         :param mod: mod argument for EVP_CipherInit_ex. 0 or 1,
                     0 means decrypting and 1 means encrypting,
-        :param libpath: the path to find libcrypto.so
         '''
 
-        if cipher_name not in self.supported_ciphers:
-            raise Exception('cipher not supported')
+        self.config = config
+        self.cipher_name = self.config.net.crypto.cipher
+        self.libpath = self.config.net.crypto.lib_path or 'libcrypto.so.1.1'
+
+        self._mod = mod
+        if self._mod not in [Mods.DECRYPTING, Mods.ENCRYPTING]:
+            raise ArgumentError(f'Invalid mod: {mod}')
+
+        self.__passwd = self.config.net.crypto.password
+        self._iv_len = self.config.net.crypto.iv_len
+
+        if self._iv_len > EVP_MAX_IV_LENGTH:
+            raise ArgumentError('IV length overflows')
+
+        self._key = HashTools.hkdf(self.__passwd, EVP_MAX_KEY_LENGTH)
+        self._iv = HashTools.hdivdf(self.__passwd, self._iv_len)
+
+        if self.cipher_name not in self.supported_ciphers:
+            raise ArgumentError(f'Unsupported cipher name: {self.cipher_name}')
 
         if not lib_loaded:
-            load_libcrypto(libpath)
-        cipher_name = cipher_name.encode('utf-8')
-        self._cph_ctx, self._cph = new_cipher_ctx(cipher_name, key, iv, mod)
-        self._key = key
-        self._iv = iv
-        self._mod = mod
+            load_libcrypto(self.libpath)
+
+        self._cph_ctx, self._cph = new_cipher_ctx(
+            self.cipher_name.encode(), self._key, self._iv, self._mod
+        )
 
     def update(self, data):
         in_ = c_char_p(data)

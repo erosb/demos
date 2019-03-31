@@ -114,6 +114,32 @@ class HashTools():
     def sha512(cls, data):
         return cls._hash('sha512', data)
 
+    @classmethod
+    def hkdf(password, key_len):
+        x = key_len * -1
+
+        return cls.sha256(
+            password.encode()
+        )[x:].encode()
+
+    @classmethod
+    def hdivdf(password, iv_len):
+        ''' Hash-based Default IV Derivation Function
+
+        Before we establish the connection and use random IVs, we will need
+        a default IV to use or we cannot establish the initial connection
+
+        And, same as the hkdf, this is enough,
+        we don't need something complicated.
+        '''
+
+        pwd_digest = cls.sha256(password.encode())
+        x = iv_len * -1
+
+        return cls.sha256(
+            pwd_digest.encode()
+        )[x:].encode()
+
 
 class Converter():
 

@@ -13,7 +13,8 @@ sock_d = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET)
 sock_d.bind(('aead', 'gcm(aes)'))
 
 
-data = 'hmmmmmmmmm' * 6000
+# data = 'hmmmmmmmmm' * 6000
+data = 'a'
 data = data.encode()
 
 print(f'Data length: {len(data)}')
