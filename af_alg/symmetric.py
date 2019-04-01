@@ -7,19 +7,21 @@ import socket
 
 
 sock_e = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET)
-sock_e.bind(('ablkcipher', 'cbc(aes)'))
+sock_e.bind(('skcipher', 'cbc(aes)'))
 
 sock_d = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET)
-sock_d.bind(('ablkcipher', 'cbc(aes)'))
+sock_d.bind(('skcipher', 'cbc(aes)'))
 
 
-data = 'hmmmmmmmmm' #* 6000
+data = 'hmmmmmmmmmmmmmmm'
 data = data.encode()
 
 print(f'Data length: {len(data)}')
+print(data)
+print('\n------------------------\n')
 
 key = os.urandom(16)
-iv = os.urandom(12)
+iv = os.urandom(16)
 
 sock_e.setsockopt(socket.SOL_ALG, socket.ALG_SET_KEY, key)
 conn_e, _ = sock_e.accept()
@@ -31,62 +33,28 @@ conn_d, _ = sock_d.accept()
 # Encrypt
 t0_e = time.time()
 conn_e.sendmsg_afalg([data], op=socket.ALG_OP_ENCRYPT, iv=iv)
-res = conn_e.recv(100)
+res = conn_e.recv(16)
 ciphertext = res
 t1_e = time.time()
 
-print(len(ciphertext))
-
-# td_e = t1_e - t0_e
-# print(f'Encryption time cost: {td_e}')
-
-
-# # Decrypt
-# msg = assoc + ciphertext + tag
+td_e = t1_e - t0_e
+print(f'Encryption time cost: {td_e}')
+print(ciphertext)
+print('\n------------------------\n')
 
 
-# try:
-    # conn_d.sendmsg_afalg(
-        # [os.urandom(len(msg))],
-        # op=socket.ALG_OP_DECRYPT,
-        # iv=iv,
-        # assoclen=assoclen
-    # )
+t0_d = time.time()
+conn_d.sendmsg_afalg([ciphertext], op=socket.ALG_OP_DECRYPT, iv=iv)
+plaintext = conn_d.recv(100)
+t1_d = time.time()
 
-    # res = conn_d.recv(len(msg) - taglen)
-    # plaintext0 = res[assoclen:]
-# except OSError as e:
-    # if e.args[0] == 74:
-        # plaintext0 = b'Bingo!'
-    # else:
-        # raise e
+td_d = t1_d - t0_d
+print(f'Decryption time cost: {td_d}')
+print(plaintext)
 
 
-# t0_d = time.time()
-# conn_d.sendmsg_afalg([msg], op=socket.ALG_OP_DECRYPT, iv=iv, assoclen=assoclen)
-# res = conn_d.recv(len(msg) - taglen)
-# plaintext1 = res[assoclen:]
-# t1_d = time.time()
+conn_e.close()
+sock_e.close()
 
-# td_d = t1_d - t0_d
-# print(f'Decryption time cost: {td_d}')
-
-
-# conn_e.close()
-# sock_e.close()
-
-# conn_d.close()
-# sock_d.close()
-
-
-# assert data == plaintext1
-
-
-# # print('\n------------------\n')
-# # print(ciphertext)
-# # print('\n------------------\n')
-
-# # print('\n------------------\n')
-# # print(plaintext0.decode())
-# # print('\n------------------\n')
-# # print(plaintext1.decode())
+conn_d.close()
+sock_d.close()
