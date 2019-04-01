@@ -73,6 +73,7 @@ class BaseKernelCryptor():
         self.config = config
 
         self.cipher_name = self.config.net.crypto.cipher
+        self.__identification = self.config.net.identification
         self.__passwd = self.config.net.crypto.password
         self._mode = mode
 
@@ -136,7 +137,7 @@ class BaseKernelCryptor():
             raise ArgumentError(f'Invalid mod: {self._mode}')
 
         self._key = HashTools.hkdf(self.__passwd, self._key_len)
-        self._iv = HashTools.hdivdf(self.__passwd, self._iv_len)
+        self._iv = HashTools.hdivdf(self.__identification, self._iv_len)
 
         self.alg_sock = self.create_alg_sock()
         self.alg_conn, _ = self.alg_sock.accept()

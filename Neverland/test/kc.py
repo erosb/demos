@@ -13,6 +13,7 @@ from neverland.protocol.crypto.kc.aead.gcm import GCMKernelCryptor
 
 config_json = {
     'net': {
+        'identification': 'a l00o00oOOoOOoo00oOOo00ong identification string',
         'crypto': {
             'password': 'a SUPER SUPER LONG AND VERY INDESCRIBABLE pASSw0rD',
             'cipher': 'kc-aes-192-gcm'
