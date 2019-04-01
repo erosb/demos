@@ -12,9 +12,9 @@ from ctypes import (
     create_string_buffer,
 )
 
-from neverland.excpetions import ArgumentError
+from neverland.exceptions import ArgumentError
 from neverland.utils import HashTools
-from neverland.protocol.crypto import Modes
+from neverland.protocol.crypto.mode import Modes
 
 
 ''' The OpenSSL crypto module

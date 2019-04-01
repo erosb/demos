@@ -5,9 +5,9 @@ import os
 import socket
 import platform
 
-from neverland.excpetions import ArgumentError
+from neverland.exceptions import ArgumentError
 from neverland.utils import HashTools
-from neverland.protocol.crypto import Modes
+from neverland.protocol.crypto.mode import Modes
 
 
 ''' The kernel crypto module
@@ -19,7 +19,7 @@ Linux kernel >= 4.9 is required
 _kernel_version_checked = False
 
 
-class BaseKernalCryptor():
+class BaseKernelCryptor():
 
     ''' The base class of kernel cryptors
     '''
@@ -36,6 +36,8 @@ class BaseKernalCryptor():
     _kc_cipher_type = None
     _kc_cipher_name = None
 
+    _aad_len = None
+
     _aead = False
 
     @classmethod
@@ -49,10 +51,10 @@ class BaseKernalCryptor():
         except Exception:
             raise RuntimeError('Unrecognized kernel version')
 
-        if major_version > KERNEL_MOJOR_VERSION:
+        if major_version > cls.KERNEL_MOJOR_VERSION:
             return
 
-        if minor_version > KERNEL_MINOR_VERSION:
+        if minor_version > cls.KERNEL_MINOR_VERSION:
             return
 
         raise RuntimeError(
@@ -86,6 +88,10 @@ class BaseKernalCryptor():
             self._iv_len
             self._kc_cipher_type
             self._kc_cipher_name
+            self._aead
+
+            attributes for aead:
+                self._aad_len
         '''
 
     def checkup(self):
@@ -95,7 +101,7 @@ class BaseKernalCryptor():
         global _kernel_version_checked
 
         if not _kernel_version_checked:
-            BaseKernalCryptor.check_kernel_version()
+            BaseKernelCryptor.check_kernel_version()
             _kernel_version_checked = True
 
         if self.cipher_name not in self.supported_ciphers:
@@ -124,7 +130,7 @@ class BaseKernalCryptor():
 
         if self._mode == Modes.ENCRYPTING:
             self._op = socket.ALG_OP_ENCRYPT
-        elif self._mode == Mods.Decryption:
+        elif self._mode == Modes.DECRYPTING:
             self._op = socket.ALG_OP_DECRYPT
         else:
             raise ArgumentError(f'Invalid mod: {self._mode}')
@@ -133,23 +139,23 @@ class BaseKernalCryptor():
         self._iv = HashTools.hdivdf(self.__passwd, self._iv_len)
 
         self.alg_sock = self.create_alg_sock()
-        self.alg_conn = self.alg_sock.accept()
+        self.alg_conn, _ = self.alg_sock.accept()
 
     def create_alg_sock(self):
         alg_sock = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET)
+        alg_sock.bind(
+            (self._kc_cipher_type, self._kc_cipher_name)
+        )
+
+        alg_sock.setsockopt(socket.SOL_ALG, socket.ALG_SET_KEY, self._key)
 
         if self._aead:
             alg_sock.setsockopt(
                 socket.SOL_ALG,
                 socket.ALG_SET_AEAD_AUTHSIZE,
                 None,
-                self.aad_len,
+                self._aad_len,
             )
-
-        alg_sock.setsockopt(socket.SOL_ALG, socket.ALG_SET_KEY, self._key)
-        alg_sock.bind(
-            (self._kc_cipher_type, self._kc_cipher_name)
-        )
 
         return alg_sock
 
@@ -157,12 +163,18 @@ class BaseKernalCryptor():
         ''' do encryption or decryption
         '''
 
+    def change_iv(self, iv):
+        self._iv = iv
+
     def clean(self):
         ''' clean/close the cryptor and release resources
         '''
 
-        self.alg_conn.close()
-        self.alg_sock.close()
+        if hasattr(self, 'alg_conn'):
+            self.alg_conn.close()
+
+        if hasattr(self, 'alg_sock'):
+            self.alg_sock.close()
 
     def reset(self):
         ''' reset the cryptor

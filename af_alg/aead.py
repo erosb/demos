@@ -13,15 +13,15 @@ sock_d = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET)
 sock_d.bind(('aead', 'gcm(aes)'))
 
 
-data = 'hmmmmmmmmm' * 11
+data = 'hmmmmmmmmm'
 data = data.encode()
 
 print(f'Data length: {len(data)}')
 
 assoc = os.urandom(16)
 assoclen = len(assoc)
-key = os.urandom(32)
-iv = os.urandom(24)
+key = os.urandom(16)
+iv = os.urandom(12)
 taglen = 16
 
 msg = assoc + data
@@ -39,9 +39,15 @@ conn_d, _ = sock_d.accept()
 t0_e = time.time()
 conn_e.sendmsg_afalg([msg], op=socket.ALG_OP_ENCRYPT, iv=iv, assoclen=assoclen)
 res = conn_e.recv(assoclen + len(data) + taglen)
-ciphertext = res[assoclen: -taglen]
+ciphertext = res[assoclen: - taglen]
 tag = res[-taglen:]
 t1_e = time.time()
+
+print(res)
+print()
+print(assoc)
+print()
+print(tag)
 
 td_e = t1_e - t0_e
 print(f'Encryption time cost: {td_e}')
