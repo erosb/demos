@@ -13,16 +13,15 @@ sock_d = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET)
 sock_d.bind(('aead', 'gcm(aes)'))
 
 
-# data = 'hmmmmmmmmm' * 6000
-data = 'a'
+data = 'hmmmmmmmmm' * 11
 data = data.encode()
 
 print(f'Data length: {len(data)}')
 
 assoc = os.urandom(16)
 assoclen = len(assoc)
-key = os.urandom(16)
-iv = os.urandom(12)
+key = os.urandom(32)
+iv = os.urandom(24)
 taglen = 16
 
 msg = assoc + data
@@ -87,13 +86,3 @@ sock_d.close()
 
 
 assert data == plaintext1
-
-
-# print('\n------------------\n')
-# print(ciphertext)
-# print('\n------------------\n')
-
-# print('\n------------------\n')
-# print(plaintext0.decode())
-# print('\n------------------\n')
-# print(plaintext1.decode())

@@ -13,14 +13,14 @@ sock_d = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET)
 sock_d.bind(('skcipher', 'cbc(aes)'))
 
 
-data = 'hmmmmmmmmmmmmmmm'
+data = 'hmmmmmmmmmmmmmmm' * 16
 data = data.encode()
 
 print(f'Data length: {len(data)}')
-print(data)
+# print(data)
 print('\n------------------------\n')
 
-key = os.urandom(16)
+key = os.urandom(32)
 iv = os.urandom(16)
 
 sock_e.setsockopt(socket.SOL_ALG, socket.ALG_SET_KEY, key)
@@ -33,24 +33,26 @@ conn_d, _ = sock_d.accept()
 # Encrypt
 t0_e = time.time()
 conn_e.sendmsg_afalg([data], op=socket.ALG_OP_ENCRYPT, iv=iv)
-res = conn_e.recv(16)
+res = conn_e.recv(65535)
 ciphertext = res
 t1_e = time.time()
 
 td_e = t1_e - t0_e
 print(f'Encryption time cost: {td_e}')
-print(ciphertext)
+# print(ciphertext)
 print('\n------------------------\n')
 
 
 t0_d = time.time()
 conn_d.sendmsg_afalg([ciphertext], op=socket.ALG_OP_DECRYPT, iv=iv)
-plaintext = conn_d.recv(100)
+plaintext = conn_d.recv(65535)
 t1_d = time.time()
 
 td_d = t1_d - t0_d
 print(f'Decryption time cost: {td_d}')
-print(plaintext)
+# print(plaintext)
+
+assert plaintext == data
 
 
 conn_e.close()

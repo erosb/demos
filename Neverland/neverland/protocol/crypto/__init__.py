@@ -1,11 +1,22 @@
 #!/usr/bin/python3.6
 # coding: utf-8
 
-from neverland.utils import HashTools
+from neverland.utils import HashTools, MetaEnum
 from neverland.exceptions import ArgumentError
 from neverland.protocol.crypto.openssl import OpenSSLCryptor, load_libcrypto
-from neverland.protocol.crypto.openssl import Mods as OpensslMods
 from neverland.protocol.crypto.kc import KernalCryptor
+
+
+class Modes(metaclass=MetaEnum):
+
+    ''' working mods of cryptors
+
+    This is from OpenSSL originally.
+    And it looks nice, so I use it in the whole crypto package.
+    '''
+
+    DECRYPTING = 0
+    ENCRYPTING = 1
 
 
 openssl_ciphers = {
@@ -52,8 +63,8 @@ class Cryptor(object):
         self._init_ciphers()
 
     def _init_ciphers(self):
-        self._cipher = self._cipher_cls(self.config, OpensslMods.ENCRYPTING)
-        self._decipher = self._cipher_cls(self.config, OpensslMods.DECRYPTING)
+        self._cipher = self._cipher_cls(self.config, Modes.ENCRYPTING)
+        self._decipher = self._cipher_cls(self.config, Modes.DECRYPTING)
 
     def reset(self):
         self._cipher.reset()

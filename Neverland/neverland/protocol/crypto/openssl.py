@@ -14,21 +14,19 @@ from ctypes import (
 
 from neverland.excpetions import ArgumentError
 from neverland.utils import HashTools
+from neverland.protocol.crypto import Modes
 
 
 ''' The OpenSSL crypto module
 
 libcrypto.so.1.1 is required
+
+Currently, it's not used.
 '''
 
 
 EVP_MAX_KEY_LENGTH = 64
 EVP_MAX_IV_LENGTH = 16
-
-
-class Mods:
-    DECRYPTING = 0
-    ENCRYPTING = 1
 
 
 libcrypto = None
@@ -92,21 +90,21 @@ class OpenSSLCryptor(object):
         'rc4-hmac-md5',
     ]
 
-    def __init__(self, config, mod):
+    def __init__(self, config, mode):
         ''' Constructor
 
         :param config: the config
-        :param mod: mod argument for EVP_CipherInit_ex. 0 or 1,
-                    0 means decrypting and 1 means encrypting,
+        :param mode: mod argument for EVP_CipherInit_ex. 0 or 1,
+                     0 means decrypting and 1 means encrypting,
         '''
 
         self.config = config
         self.cipher_name = self.config.net.crypto.cipher
         self.libpath = self.config.net.crypto.lib_path or 'libcrypto.so.1.1'
 
-        self._mod = mod
-        if self._mod not in [Mods.DECRYPTING, Mods.ENCRYPTING]:
-            raise ArgumentError(f'Invalid mod: {mod}')
+        self._mod = mode
+        if self._mod not in Modes:
+            raise ArgumentError(f'Invalid mode: {mode}')
 
         self.__passwd = self.config.net.crypto.password
         self._iv_len = self.config.net.crypto.iv_len
